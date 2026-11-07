@@ -1,0 +1,24 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AGENDA TV GRAPHICS · Control</title>
+<link rel="stylesheet" href="../assets/gfx.css"><link rel="stylesheet" href="control.css"></head>
+<body>
+<aside><h1>AGENDA TV<small>GRAPHICS</small></h1><nav><a class="on">Operación</a></nav>
+  <div class="foot"><div id="status" class="status">…</div><label>URL para OBS</label><input id="obsurl" readonly></div></aside>
+<main>
+  <section class="monitors">
+    <div><h2>PREVIEW</h2><div class="mon" id="mPrev"></div></div>
+    <div><h2 class="onair">PROGRAMA · OBS</h2><div class="mon air" id="mProg"></div></div>
+  </section>
+  <section class="quick" id="quick"></section>
+  <section class="panel">
+    <div class="cols"><div id="fields"></div>
+      <div><label>Animación</label><select id="animIn"></select>
+      <label>Duración (ms)</label><input type="number" id="dur" min="100" max="3000" step="50">
+      <label>Color acento</label><input type="color" id="cAccent">
+      <label>Color fondo</label><input type="color" id="cBg">
+      <label>Color texto</label><input type="color" id="cText"></div></div>
+    <div class="btns"><button id="bPrev">Previsualizar</button><button id="bShow" class="go">Mostrar</button>
+      <button id="bUpd">Actualizar</button><button id="bHide" class="stop">Ocultar</button><button id="bClr">Limpiar</button></div>
+  </section>
+</main>
+<script type="module" src="control.js"></script></body></html>
