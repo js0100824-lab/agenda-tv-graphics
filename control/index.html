@@ -18,7 +18,14 @@
       <label>Color fondo</label><input type="color" id="cBg">
       <label>Color texto</label><input type="color" id="cText"></div></div>
     <div class="btns"><button id="bPrev">Previsualizar</button><button id="bShow" class="go">Mostrar</button>
-      <button id="bUpd">Actualizar</button><button id="bHide" class="stop">Ocultar</button><button id="bClr">Limpiar</button></div>
+      <button id="bUpd">Actualizar</button><button id="bHide" class="stop">Ocultar</button><button id="bClr">Limpiar</button><button id="bSave" class="sv">Guardar en lista</button></div>
   </section>
+  <section class="panel"><h2>Ajustes del elemento (cada uno es independiente)</h2>
+    <div class="g5"><div><label>Elemento</label><select id="elSel"></select></div>
+      <div><label>Tamaño de letra</label><input type="range" id="elR" min="10" max="220"><input type="number" id="el_size"></div>
+      <div><label>X</label><input type="number" id="el_x"></div><div><label>Y</label><input type="number" id="el_y"></div>
+      <div><label>Ancho</label><input type="number" id="el_w"></div><div><label>Alto</label><input type="number" id="el_h"></div></div>
+    <label>Comportamiento del texto largo</label><select id="el_fit"></select></section>
+  <section class="panel"><h2>Guardados de este gráfico</h2><div id="lib"></div></section>
 </main>
 <script type="module" src="control.js"></script></body></html>

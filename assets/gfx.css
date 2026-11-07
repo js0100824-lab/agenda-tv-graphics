@@ -1,9 +1,5 @@
 .stage{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;overflow:hidden;font-family:'Segoe UI',Arial,Helvetica,sans-serif}
-.gfx{position:absolute}
-.headline{left:80px;bottom:130px;width:1500px}
-.headline .tag{display:inline-block;padding:6px 24px;background:var(--accent);font-size:26px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-.headline .main{background:var(--bg);padding:14px 30px;font-size:54px;font-weight:700;text-transform:uppercase;line-height:1.1}
-.headline .sub{background:var(--bg);box-shadow:inset 0 0 0 999px rgba(255,255,255,.12);padding:10px 30px;font-size:30px}
-.nameplate{right:120px;bottom:300px;min-width:420px}
-.nameplate .name{background:var(--bg);padding:10px 26px;font-size:34px;font-weight:700;border-left:8px solid var(--accent)}
-.nameplate .role{background:var(--bg);box-shadow:inset 0 0 0 999px rgba(255,255,255,.12);padding:6px 26px 6px 34px;font-size:24px}
+.gfx{position:absolute;left:0;top:0;width:1920px;height:1080px;pointer-events:none}
+.el{position:absolute;box-sizing:border-box}
+.el.txt{display:flex}
+.el.txt>div{width:100%;line-height:1.12;overflow-wrap:anywhere}
