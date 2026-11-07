@@ -1,10 +1,17 @@
-# AGENDA TV GRAPHICS (Fase 1)
-1. Sube la carpeta a GitHub Pages (los módulos ES no funcionan abriendo el archivo con doble clic; necesitan http/https).
+# AGENDA TV GRAPHICS (Fase 1 + nueva versión)
+1. Sube la carpeta a GitHub Pages (los módulos ES necesitan http/https).
 2. Crea un proyecto Firebase con Realtime Database y pega tu config en `firebase-config.js`.
-3. Reglas temporales de prueba (Realtime Database > Reglas): `{ "rules": { ".read": true, ".write": true } }`. Se endurecerán en la Fase 6.
-4. Panel: `/control/index.html`. OBS: Fuente de navegador con la URL de `/output/index.html`, 1920x1080.
-Sin `databaseURL` funciona en modo local (misma ventana del navegador), solo para pruebas.
+3. Reglas temporales de prueba: `{ "rules": { ".read": true, ".write": true } }` (se endurecerán en la Fase 6).
+4. Panel: `/control/index.html`. OBS: Fuente de navegador con `/output/index.html`, 1920x1080, sin recargar nunca.
+Sin `databaseURL` funciona en modo local (mismo navegador), solo para pruebas.
 
-## Fase 1b
-Plantillas por elementos independientes, ajuste de texto sin mover el resto, tamaño del titular por separado y lista de guardados por gráfico (Firebase `/library`).
-Sube TODO el contenido de nuevo y recarga con Ctrl+F5.
+## Novedades
+- **Elementos independientes**: cada texto, logo, forma o cintilla tiene su propia posición y tamaño; mover o agrandar uno no desplaza a los demás.
+- **Texto grande**: tamaño máximo/mínimo, ancho y alto propios, varias líneas y ajuste automático (el texto se reduce hasta caber y nunca sale de su caja).
+- **10 plantillas** de canal informativo (logo, subtítulo, categoría, noticia secundaria, cintilla…).
+- **Logotipos**: subir PNG/JPG/WebP, cambiar, quitar, mover y redimensionar conservando proporciones (arrastrando en PREVIEW).
+- **Cintilla**: noticias editables, movimiento continuo sin huecos, velocidad, dirección, colores, tipografía, altura/posición, separadores, pausa/reanudar y activar/ocultar EN VIVO (barra amarilla), independiente del titular.
+- **Diseño**: añadir/duplicar/eliminar textos, imágenes, logos, formas y cintillas; guardar plantillas propias.
+- **Titulares guardados** (sin categorías): guardar con nombre, editar, duplicar, eliminar, buscar y cargar; opcionalmente con todo su diseño y cintilla.
+- Todo se sincroniza con `/program` en tiempo real, con fondo transparente. Datos nuevos: `/headlines` y `/templates`.
+- Los datos antiguos de la Fase 1 (sin elementos) se ignoran y se sustituyen por plantillas nuevas.

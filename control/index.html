@@ -1,8 +1,10 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AGENDA TV GRAPHICS · Control</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Montserrat:wght@400;600;700;800&family=Oswald:wght@400;700&family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/gfx.css"><link rel="stylesheet" href="control.css"></head>
 <body>
-<aside><h1>AGENDA TV<small>GRAPHICS</small></h1><nav><a class="on">Operación</a></nav>
+<aside><h1>AGENDA TV<small>GRAPHICS</small></h1>
+  <nav id="nav"><a data-tab="op" class="on">Operación</a><a data-tab="design">Diseño</a><a data-tab="ticker">Cintilla</a><a data-tab="saved">Titulares guardados</a><a data-tab="tpl">Plantillas</a></nav>
   <div class="foot"><div id="status" class="status">…</div><label>URL para OBS</label><input id="obsurl" readonly></div></aside>
 <main>
   <section class="monitors">
@@ -10,22 +12,45 @@
     <div><h2 class="onair">PROGRAMA · OBS</h2><div class="mon air" id="mProg"></div></div>
   </section>
   <section class="quick" id="quick"></section>
-  <section class="panel">
+  <section class="livebar" id="liveBar" hidden></section>
+
+  <section class="panel tab" id="tab-op">
     <div class="cols"><div id="fields"></div>
-      <div><label>Animación</label><select id="animIn"></select>
-      <label>Duración (ms)</label><input type="number" id="dur" min="100" max="3000" step="50">
-      <label>Color acento</label><input type="color" id="cAccent">
-      <label>Color fondo</label><input type="color" id="cBg">
-      <label>Color texto</label><input type="color" id="cText"></div></div>
+      <div><label>Animación de entrada/salida</label><select id="animIn"></select>
+      <label>Duración (ms)</label><input type="number" id="dur" min="100" max="3000" step="50"></div></div>
     <div class="btns"><button id="bPrev">Previsualizar</button><button id="bShow" class="go">Mostrar</button>
-      <button id="bUpd">Actualizar</button><button id="bHide" class="stop">Ocultar</button><button id="bClr">Limpiar</button><button id="bSave" class="sv">Guardar en lista</button></div>
+      <button id="bUpd">Actualizar</button><button id="bHide" class="stop">Ocultar</button><button id="bClr">Limpiar</button></div>
   </section>
-  <section class="panel"><h2>Ajustes del elemento (cada uno es independiente)</h2>
-    <div class="g5"><div><label>Elemento</label><select id="elSel"></select></div>
-      <div><label>Tamaño de letra</label><input type="range" id="elR" min="10" max="220"><input type="number" id="el_size"></div>
-      <div><label>X</label><input type="number" id="el_x"></div><div><label>Y</label><input type="number" id="el_y"></div>
-      <div><label>Ancho</label><input type="number" id="el_w"></div><div><label>Alto</label><input type="number" id="el_h"></div></div>
-    <label>Comportamiento del texto largo</label><select id="el_fit"></select></section>
-  <section class="panel"><h2>Guardados de este gráfico</h2><div id="lib"></div></section>
+
+  <section class="panel tab" id="tab-design" hidden>
+    <div class="cols3">
+      <div>
+        <h3>Elementos</h3><div id="elList" class="elist"></div>
+        <div class="adds"><button id="addText">+ Texto</button><button id="addLogo">+ Logotipo</button><button id="addImg">+ Imagen</button><button id="addShape">+ Forma</button><button id="addTicker">+ Cintilla</button></div>
+        <h3>Guardar como plantilla</h3>
+        <div class="row"><input id="tName" placeholder="Nombre de la plantilla"><button id="tSave" class="go">Guardar</button></div>
+        <p class="hint">Arrastra el elemento en PREVIEW para moverlo y usa el cuadro de la esquina para cambiar su tamaño (Shift mantiene proporciones).</p>
+      </div>
+      <div id="insp"></div>
+    </div>
+  </section>
+
+  <section class="panel tab" id="tab-ticker" hidden><div id="tkInsp"></div></section>
+
+  <section class="panel tab" id="tab-saved" hidden>
+    <h3>Guardar el titular actual</h3>
+    <div class="saveRow"><input id="hName" placeholder="Nombre para identificar el titular">
+      <label class="chk"><input type="checkbox" id="hDesign"> Guardar con su diseño (plantilla, logo, colores, tipografías, tamaños, posiciones y cintilla)</label>
+      <button id="hSave" class="go">Guardar titular</button><button id="hUpd" class="go" hidden>Actualizar guardado</button><button id="hCancel" hidden>Cancelar edición</button></div>
+    <h3>TITULARES GUARDADOS</h3>
+    <input id="hSearch" placeholder="Buscar titulares…"><div id="hList" class="hlist"></div>
+  </section>
+
+  <section class="panel tab" id="tab-tpl" hidden>
+    <p class="hint" id="tplHint"></p>
+    <h3>Biblioteca</h3><div id="tplBuilt" class="grid"></div>
+    <h3>Mis plantillas</h3><div id="tplMine" class="grid"></div>
+  </section>
 </main>
+<datalist id="sepList"><option value="●"><option value="◆"><option value="■"><option value="★"><option value="•"><option value="|"><option value="—"><option value="//"></datalist>
 <script type="module" src="control.js"></script></body></html>

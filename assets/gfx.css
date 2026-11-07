@@ -1,5 +1,14 @@
 .stage{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;overflow:hidden;font-family:'Segoe UI',Arial,Helvetica,sans-serif}
-.gfx{position:absolute;left:0;top:0;width:1920px;height:1080px;pointer-events:none}
-.el{position:absolute;box-sizing:border-box}
-.el.txt{display:flex}
-.el.txt>div{width:100%;line-height:1.12;overflow-wrap:anywhere}
+.gfx{position:absolute;inset:0;pointer-events:none}
+.el{position:absolute;box-sizing:border-box;overflow:hidden}
+.el *{box-sizing:border-box}
+.el.text{display:flex}
+.el.text .t{width:100%;white-space:pre-line;overflow-wrap:anywhere;word-break:break-word}
+.el.image img{width:100%;height:100%;display:block}
+.el.image.ph{display:flex;align-items:center;justify-content:center;border:3px dashed rgba(255,255,255,.65);background:rgba(0,0,0,.35);color:#fff;font:700 24px 'Segoe UI',Arial,sans-serif}
+.el.ticker{display:flex;align-items:stretch}
+.tkl{flex:none;display:flex;align-items:center;padding:0 28px;white-space:nowrap;font-weight:800;text-transform:uppercase}
+.tkv{flex:1;position:relative;overflow:hidden;min-width:0}
+.tkt{position:absolute;left:0;top:0;height:100%;display:flex;will-change:transform}
+.tkseg{display:flex;flex:none;align-items:center;white-space:nowrap}
+.tkseg .sep{flex:none}
