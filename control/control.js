@@ -1,8 +1,8 @@
-import * as store from '../modules/store.js';
-import * as db from '../modules/firebase.js';
-import { createStage } from '../modules/stage.js';
-import { SLOTS, DEFAULT_NAMES, isBuiltin, TEMPLATES, TEMPLATE_LIST, FONTS, arr, uid, layerOf, instantiate, newText, newImage, newLogo, newShape, newTicker, newClock } from '../modules/templates.js';
-import { CATALOG, normAnim, outKey } from '../modules/animations.js';
+import * as store from '../modules/store.js?v=13c';
+import * as db from '../modules/firebase.js?v=13c';
+import { createStage } from '../modules/stage.js?v=13c';
+import { SLOTS, DEFAULT_NAMES, isBuiltin, TEMPLATES, TEMPLATE_LIST, FONTS, arr, uid, layerOf, instantiate, newText, newImage, newLogo, newShape, newTicker, newClock } from '../modules/templates.js?v=13c';
+import { CATALOG, normAnim, outKey } from '../modules/animations.js?v=13c';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

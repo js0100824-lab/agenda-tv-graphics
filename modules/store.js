@@ -1,7 +1,7 @@
 // Estado central: /draft (lo que editas y ves en PREVIEW) y /program (lo que ve OBS).
 // Además: /headlines (titulares guardados) y /templates (plantillas personalizadas).
-import * as db from './firebase.js';
-import { SLOTS, DEFAULT_NAMES, newGraphic, arr, uid, setCustomSlots, applyOrder, setNames, setClosed, isBuiltin, getOrder } from './templates.js';
+import * as db from './firebase.js?v=13c';
+import { SLOTS, DEFAULT_NAMES, newGraphic, arr, uid, setCustomSlots, applyOrder, setNames, setClosed, isBuiltin, getOrder } from './templates.js?v=13c';
 
 const state = { draft: {}, program: {}, headlines: {}, templates: {}, slots: {}, names: {}, programs: {}, closed: {}, openSrc: {} };
 const subs = new Set();
