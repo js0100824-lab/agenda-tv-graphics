@@ -98,3 +98,8 @@ Sin `databaseURL` funciona en modo local (mismo navegador), solo para pruebas.
 ## Versión 13c
 - **Avisos propios**: se quitaron las alertas del navegador (las ventanas de Chrome). Ahora los avisos, las confirmaciones (con botón rojo «Eliminar» cuando borra algo) y los cuadros para escribir nombres (nueva fuente, renombrar fuente o programa) son ventanas del propio panel. Enter acepta y Esc cancela.
 - **Versión en los archivos** (`?v=13c`): los archivos del panel y de la salida llevan un número de versión para que el navegador no use copias viejas al subir una versión nueva. Al subir la siguiente, se cambia ese número.
+
+## Versión 13d
+- **Cintilla transparente**: en Cintilla (y en Editor al seleccionarla) el «Fondo de la cinta» tiene casilla: sin marcar queda transparente y solo se ven las letras. Lo mismo para el fondo de la etiqueta izquierda.
+- **Empezar en blanco**: pide el nombre, crea la fuente vacía (sin plantilla) y la abre en Editor. El botón está en Editor y ahora también en Operación.
+- Número de versión de los archivos: `?v=13d`.

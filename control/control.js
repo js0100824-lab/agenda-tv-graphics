@@ -1,8 +1,8 @@
-import * as store from '../modules/store.js?v=13c';
-import * as db from '../modules/firebase.js?v=13c';
-import { createStage } from '../modules/stage.js?v=13c';
-import { SLOTS, DEFAULT_NAMES, isBuiltin, TEMPLATES, TEMPLATE_LIST, FONTS, arr, uid, layerOf, instantiate, newText, newImage, newLogo, newShape, newTicker, newClock } from '../modules/templates.js?v=13c';
-import { CATALOG, normAnim, outKey } from '../modules/animations.js?v=13c';
+import * as store from '../modules/store.js?v=13d';
+import * as db from '../modules/firebase.js?v=13d';
+import { createStage } from '../modules/stage.js?v=13d';
+import { SLOTS, DEFAULT_NAMES, isBuiltin, TEMPLATES, TEMPLATE_LIST, FONTS, arr, uid, layerOf, instantiate, newText, newImage, newLogo, newShape, newTicker, newClock } from '../modules/templates.js?v=13d';
+import { CATALOG, normAnim, outKey } from '../modules/animations.js?v=13d';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -220,9 +220,9 @@ $('swToggle').onclick = () => {
 };
 async function newBlankGraphic() {   // crea OTRO gráfico vacío; el gráfico seleccionado no se toca
   const name = (await uiPrompt('Nombre de la nueva fuente en blanco:', 'Fuente ' + (Object.keys(SLOTS).length + 1)) || '').trim(); if (!name) return null;
-  const id = store.addSlot(name); selectSlot(id); if (tab !== 'design') store.preview(id); return id;
+  const id = store.addSlot(name); selectSlot(id); if (tab !== 'design') setTab('design'); return id;   // vacía y lista para diseñar en Editor, sin elegir plantilla
 }
-$('tBlank').onclick = newBlankGraphic;
+$('tBlank').onclick = newBlankGraphic; $('opBlank').onclick = newBlankGraphic;
 function buildLive(s) {
   const box = $('liveBar'), tk = tickerOf(s.draft[sel]);
   if (!tk) { box.hidden = true; return; }
@@ -527,9 +527,9 @@ const SECTIONS = {
   shape: [['Forma', [['color', 'Color', 'color'], ['opacity', 'Opacidad', 'num', { min: 0, max: 1, step: .05 }], ['radius', 'Redondeo (px)', 'num', { min: 0 }]]]],
   ticker: [['Movimiento', [['speed', 'Velocidad (px/s)', 'num', { min: 10, max: 1000, step: 10 }], ['dir', 'Dirección', 'select', [['left', 'Hacia la izquierda'], ['right', 'Hacia la derecha']]]]],
     ['Texto', [['font', 'Tipografía', 'select', FONTSEL], ['size', 'Tamaño de letra (px)', 'num', { min: 10, max: 200 }], ['weight', 'Grosor', 'select', WEIGHTS], ['upper', 'Mayúsculas', 'check']]],
-    ['Colores', [['color', 'Color del texto', 'color'], ['bg', 'Color de fondo', 'color']]],
+    ['Colores', [['color', 'Color del texto', 'color'], ['bg', 'Fondo de la cinta (sin marcar = transparente, solo letras)', 'coloropt']]],
     ['Separador entre noticias', [['sep', 'Separador', 'text', { list: 'sepList' }], ['sepColor', 'Color del separador', 'color'], ['sepGap', 'Espacio alrededor (px)', 'num', { min: 0 }]]],
-    ['Etiqueta izquierda', [['label', 'Texto (vacío = sin etiqueta)', 'text'], ['labelBg', 'Fondo de la etiqueta', 'color'], ['labelColor', 'Color del texto', 'color']]]]
+    ['Etiqueta izquierda', [['label', 'Texto (vacío = sin etiqueta)', 'text'], ['labelBg', 'Fondo de la etiqueta (sin marcar = transparente)', 'coloropt'], ['labelColor', 'Color del texto', 'color']]]]
 };
 const grid = (specs, id) => { const d = mk$('div', 'gx'); specs.forEach(s => d.append(mk(s, id))); return d; };
 const card = (title, body) => { const c = mk$('div', 'dcard'); c.append(mk$('h3', '', title), body); return c; };
@@ -918,7 +918,7 @@ function renderProgs() {
 let tplKey = null;
 async function useTemplate(t) {
   if (t.key !== 'blank' && !SLOTS[sel]) { await uiAlert('No hay fuentes abiertas. Abre un programa o añade una fuente.'); return; }
-  if (t.key === 'blank') { if (await newBlankGraphic() && tab !== 'design') setTab('design'); return; }
+  if (t.key === 'blank') { await newBlankGraphic(); return; }
   store.setGraphic(sel, instantiate(t, draftOf())); const s = S(); s.id = null; s.grp = null; s.multi = new Set(); $('fields').dataset.k = ''; render(store.get());
 }
 function addCard(grid, t, del) {

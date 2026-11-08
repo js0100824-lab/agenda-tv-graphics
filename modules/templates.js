@@ -270,7 +270,7 @@ export function buildElement(e, opts = {}) {
   } else if (e.type === 'ticker') {
     s.background = e.bg || 'transparent'; s.color = e.color || '#fff'; s.fontFamily = ff(e.font);
     s.fontSize = num(e.size, 36) + 'px'; s.fontWeight = e.weight || 600;
-    if (e.label) { const l = div('tkl', e.label); l.style.background = e.labelBg || '#dc2626'; l.style.color = e.labelColor || '#fff'; n.append(l); }
+    if (e.label) { const l = div('tkl', e.label); l.style.background = e.labelBg === '' ? 'transparent' : (e.labelBg || '#dc2626'); l.style.color = e.labelColor || '#fff'; n.append(l); }
     const vp = div('tkv'), tr = div('tkt'); vp.append(tr); n.append(vp);
     n._paused = !!e.paused;
     n._pause = f => { n._paused = !!f; if (n._anim) { if (f) n._anim.pause(); else n._anim.play(); } };
