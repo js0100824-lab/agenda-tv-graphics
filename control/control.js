@@ -1,8 +1,8 @@
 import * as store from '../modules/store.js';
 import * as db from '../modules/firebase.js';
 import { createStage } from '../modules/stage.js';
-import { SLOTS, TEMPLATE_LIST, FONTS, arr, instantiate, newText, newImage, newLogo, newShape, newTicker } from '../modules/templates.js';
-import { ANIMS } from '../modules/animations.js';
+import { SLOTS, TEMPLATES, TEMPLATE_LIST, FONTS, arr, uid, instantiate, newText, newImage, newLogo, newShape, newTicker } from '../modules/templates.js';
+import { CATALOG, normAnim, outKey } from '../modules/animations.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -11,36 +11,112 @@ const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '
 const mk$ = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 const prev = createStage($('mPrev'), { placeholders: true }), prog = createStage($('mProg'));
-let sel = 'headline', tab = 'op', editingH = null;
-const selIds = {};
+let sel = 'headline', tab = 'op', editingH = null, loopOn = false, animElId = null;
+const STAGE = { x: 0, y: 0, w: 1920, h: 1080 };
+
+// ---------- Selección: un elemento, varios (Mayús + clic) o un grupo completo ----------
+const SEL = {};   // por gráfico: { id: elemento principal, multi: Set de ids, grp: id del grupo seleccionado }
+const S = () => SEL[sel] || (SEL[sel] = { id: null, multi: new Set(), grp: null });
 const draftOf = () => store.get().draft[sel];
-const curEl = () => { const g = draftOf(); return g && arr(g.elements).find(e => e.id === selIds[sel]); };
-const tickerOf = g => { if (!g) return null; const t = arr(g.elements).filter(e => e.type === 'ticker'); return t.find(e => e.id === selIds[sel]) || t[0] || null; };
+const elsOf = g => arr(g && g.elements);
+const grpOf = g => (g && g.groups) || {};
+const byId = (g, id) => elsOf(g).find(e => e.id === id);
+const curEl = () => { const g = draftOf(); return g && byId(g, S().id); };
+const tickerOf = g => { if (!g) return null; const t = elsOf(g).filter(e => e.type === 'ticker'); return t.find(e => e.id === S().id) || t[0] || null; };
 const edit = (elId, fn) => store.mutate(sel, g => { const e = g.elements.find(x => x.id === elId); if (e) fn(e, g); });
+
+function selectOne(id) { const s = S(); s.id = id; s.multi = new Set(id ? [id] : []); s.grp = null; render(store.get()); }
+function selectGroup(gid) {
+  const s = S(), m = elsOf(draftOf()).filter(e => e.group === gid);
+  s.grp = gid; s.multi = new Set(m.map(e => e.id)); s.id = m.length ? m[m.length - 1].id : null; render(store.get());
+}
+function toggleMulti(id) {
+  const s = S(); s.grp = null;
+  if (s.multi.has(id)) s.multi.delete(id); else s.multi.add(id);
+  s.id = s.multi.has(id) ? id : ([...s.multi].pop() || s.id); render(store.get());
+}
+function fixSel(g) {   // mantiene la selección válida si cambian o desaparecen elementos
+  const s = S(), ids = new Set(elsOf(g).map(e => e.id));
+  s.multi = new Set([...s.multi].filter(i => ids.has(i)));
+  if (s.grp && !elsOf(g).some(e => e.group === s.grp)) s.grp = null;
+  if (!ids.has(s.id)) s.id = null;
+  if (!s.id) { const f = elsOf(g).find(e => e.type === 'text') || elsOf(g)[0]; if (f) { s.id = f.id; s.grp = null; s.multi = new Set([f.id]); } }
+  if (!s.multi.size && s.id) s.multi.add(s.id);
+}
+function target() {   // elementos sobre los que actúan mover, escalar y alinear
+  const g = draftOf(), s = S(); if (!g) return { els: [], group: null };
+  if (s.grp) return { els: elsOf(g).filter(e => e.group === s.grp), group: s.grp };
+  const ids = s.multi.size > 1 ? [...s.multi] : [s.id];
+  return { els: elsOf(g).filter(e => ids.includes(e.id)), group: null };
+}
+function isLocked(g, t) {
+  const gr = grpOf(g);
+  return t.els.some(e => e.locked || (e.group && gr[e.group] && gr[e.group].locked));
+}
+const bb = els => {
+  if (!els.length) return { x: 0, y: 0, w: 0, h: 0 };
+  const x0 = Math.min(...els.map(e => +e.x)), y0 = Math.min(...els.map(e => +e.y));
+  return { x: x0, y: y0, w: Math.max(...els.map(e => +e.x + +e.w)) - x0, h: Math.max(...els.map(e => +e.y + +e.h)) - y0 };
+};
+function scaleEl(e, o, bx, by, k) {   // escala un elemento respecto a la esquina (bx,by) a partir de su estado original o
+  e.x = Math.round(bx + (o.x - bx) * k); e.y = Math.round(by + (o.y - by) * k);
+  e.w = Math.max(1, Math.round(o.w * k)); e.h = Math.max(1, Math.round(o.h * k));
+  ['size', 'minSize', 'padX', 'radius', 'sepGap'].forEach(p => { if (o[p] != null && o[p] !== '') e[p] = Math.max(p === 'size' || p === 'minSize' ? 6 : 0, Math.round(o[p] * k)); });
+}
+function cleanGroups(g) {   // un grupo necesita al menos 2 elementos
+  const m = g.groups || (g.groups = {}), cnt = {};
+  g.elements.forEach(e => { if (e.group) cnt[e.group] = (cnt[e.group] || 0) + 1; });
+  g.elements.forEach(e => { if (e.group && (!m[e.group] || cnt[e.group] < 2)) delete e.group; });
+  for (const k in m) if ((cnt[k] || 0) < 2) delete m[k];
+}
+function activeGroup() { const g = draftOf(), s = S(), e = curEl(); return s.grp || (s.multi.size <= 1 && e && e.group && grpOf(g)[e.group] ? e.group : null); }
 
 $('obsurl').value = new URL('../output/index.html', location.href).href;
 db.onStatus(s => { const e = $('status'); e.className = 'status ' + s;
   e.textContent = { local: 'MODO LOCAL (sin Firebase)', connecting: 'Conectando…', online: 'Firebase conectado', offline: 'Sin conexión' }[s]; });
-$('animIn').innerHTML = Object.entries(ANIMS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
 
 // ---------- Pestañas ----------
-document.querySelectorAll('#nav a').forEach(a => a.onclick = () => {
-  tab = a.dataset.tab;
-  document.querySelectorAll('#nav a').forEach(x => x.classList.toggle('on', x === a));
-  document.querySelectorAll('.tab').forEach(t => t.hidden = t.id !== 'tab-' + tab);
-  if (tab === 'design' && draftOf() && !draftOf().visible) store.mutate(sel, () => {});
+function setTab(t) {
+  tab = t;
+  document.querySelectorAll('#nav a').forEach(x => x.classList.toggle('on', x.dataset.tab === t));
+  document.querySelectorAll('.tab').forEach(x => x.hidden = x.id !== 'tab-' + t);
+  if (t !== 'design') closeBig();
+  $('bigOpen').hidden = t !== 'design';
+  if (t === 'design' && draftOf() && !draftOf().visible) store.mutate(sel, () => {});
   render(store.get());
-});
+}
+document.querySelectorAll('#nav a').forEach(a => a.onclick = () => setTab(a.dataset.tab));
 
 // ---------- Selector de gráfico y barra en vivo ----------
-function buildQuick(s) {
-  const q = $('quick'); const html = Object.keys(SLOTS).map(id => {
-    const on = s.program[id] && s.program[id].visible;
-    return `<button data-id="${id}" class="${id === sel ? 'sel' : ''}">${SLOTS[id].name}<span class="st ${on ? 'on' : ''}">${on ? 'EN AIRE' : 'OFF'}</span></button>`;
-  }).join('');
-  if (q.dataset.k === html) return; q.dataset.k = html; q.innerHTML = html;
-  q.querySelectorAll('button').forEach(b => b.onclick = () => { sel = b.dataset.id; $('fields').dataset.k = ''; render(store.get()); });
+// ---------- Salida al aire: un botón por gráfico (clic = mostrar en rojo, otro clic = ocultar) ----------
+function toggleAir(id) { const pg = store.get().program[id]; if (pg && pg.visible) store.hide(id); else store.show(id); }
+function selectSlot(id) {
+  loopOn = false; syncLoopBtns(); prev.stopTest(sel); sel = id;
+  ['fields', 'animQuick', 'animFull', 'animEl', 'insp'].forEach(i => { $(i).dataset.k = ''; }); render(store.get());
 }
+function buildAirpad(s) {
+  const box = $('airpad'), ids = Object.keys(SLOTS);
+  const key = ids.map(id => [id, SLOTS[id].name, !!(s.program[id] && s.program[id].visible), id === sel].join(':')).join('|');
+  if (box.dataset.k === key) return; box.dataset.k = key; box.innerHTML = '';
+  ids.forEach(id => {
+    const on = !!(s.program[id] && s.program[id].visible), cell = mk$('div', 'acell' + (id === sel ? ' sel' : ''));
+    const b = mk$('button', 'abtn' + (on ? ' on' : ''));
+    b.innerHTML = `<span class="an">${esc(SLOTS[id].name)}</span><span class="as">${on ? '● EN AIRE · clic para ocultar' : 'Clic para mostrar'}</span>`;
+    b.onclick = () => toggleAir(id);
+    const side = mk$('div', 'aside'), add = (t, f) => { const x = mk$('button', '', t); x.onclick = f; side.append(x); };
+    add(id === sel ? '✎ Editando' : '✎ Editar', () => selectSlot(id));
+    if (SLOTS[id].custom) {
+      add('Renombrar', () => { const n = (prompt('Nuevo nombre:', SLOTS[id].name) || '').trim(); if (n) store.renameSlot(id, n); });
+      add('Eliminar', () => { if (confirm(`¿Eliminar el gráfico «${SLOTS[id].name}»? Se borra también su diseño.`)) { if (sel === id) selectSlot('headline'); store.removeSlot(id); } });
+    }
+    cell.append(b, side); box.append(cell);
+  });
+}
+$('slotAdd').onclick = () => {
+  const name = (prompt('Nombre del nuevo gráfico (por ejemplo: Marcador, Reloj, Logo):') || '').trim(); if (!name) return;
+  selectSlot(store.addSlot(name)); setTab('tpl');   // empieza en blanco: elige una plantilla o diseña desde cero
+};
+$('tBlank').onclick = () => useTemplate(TEMPLATES.blank);
 function buildLive(s) {
   const box = $('liveBar'), tk = tickerOf(s.draft[sel]);
   if (!tk) { box.hidden = true; return; }
@@ -55,7 +131,7 @@ function buildLive(s) {
 
 // ---------- Pestaña Operación ----------
 function syncContent(g) {
-  const texts = arr(g.elements).filter(e => e.type === 'text'), box = $('fields');
+  const texts = elsOf(g).filter(e => e.type === 'text'), box = $('fields');
   const key = sel + ':' + texts.map(e => e.id).join(',');
   if (box.dataset.k !== key) {
     box.dataset.k = key; box.innerHTML = '';
@@ -63,16 +139,85 @@ function syncContent(g) {
     if (!texts.length) box.innerHTML = '<p class="hint">Este gráfico no tiene cuadros de texto. Puedes añadirlos en la pestaña Diseño.</p>';
   }
   box.querySelectorAll('textarea').forEach(t => { const e = texts.find(x => x.id === t.dataset.id); if (e && document.activeElement !== t) t.value = e.text ?? ''; });
-  if (document.activeElement !== $('animIn')) $('animIn').value = g.anim.in;
-  if (document.activeElement !== $('dur')) $('dur').value = g.anim.duration;
 }
-$('animIn').onchange = e => store.mutate(sel, g => { g.anim = { ...g.anim, in: e.target.value }; });
-$('dur').oninput = e => store.mutate(sel, g => { g.anim = { ...g.anim, duration: +e.target.value }; });
 $('bPrev').onclick = () => store.preview(sel);
-$('bShow').onclick = () => store.show(sel);
 $('bUpd').onclick = () => store.update(sel);
-$('bHide').onclick = () => store.hide(sel);
 $('bClr').onclick = () => { store.clearDraft(sel); $('fields').dataset.k = ''; render(store.get()); };
+
+// ---------- Animaciones: configuración y previsualización ----------
+const inOpts = () => Object.entries(CATALOG).filter(([, c]) => c.only !== 'out').map(([k, c]) => [k, c.label]);
+const outOpts = () => [['auto', 'Automática (inversa de la entrada)'], ...Object.entries(CATALOG).filter(([, c]) => c.only !== 'in').map(([k, c]) => [k, c.label])];
+
+// scope 'g': ajustes del gráfico · scope 'e': ajustes propios de un elemento (vacío = heredar del gráfico)
+function animFields(box, scope, el, full) {
+  const inh = scope === 'e', ga = normAnim((draftOf() || {}).anim), ov = (el && el.anim) || {};
+  const inKey = inh && ov.in && CATALOG[ov.in] ? ov.in : ga.in;
+  const eff = { in: inKey, out: inh && ov.out ? ov.out : ga.out };
+  const dIn = (CATALOG[inKey] || {}).dirs, dOut = (CATALOG[outKey(eff)] || {}).dirs, H = inh ? [['', 'Heredar del gráfico']] : [];
+  const set = (p, v) => scope === 'g' ? store.mutate(sel, g => { g.anim = { ...g.anim, [p]: v }; }) : edit(el.id, e => { e.anim = { ...(e.anim || {}), [p]: v }; });
+  const F = (p, label, kind, opt) => {
+    const w = mk$('div', 'f'); w.append(mk$('label', '', label)); let i;
+    if (kind === 'sel') { i = mk$('select'); opt.forEach(([v, t]) => { const o = mk$('option', '', t); o.value = v; i.append(o); }); }
+    else { i = mk$('input'); i.type = 'number'; Object.entries(opt || {}).forEach(([k, v]) => i.setAttribute(k, v)); if (inh) i.placeholder = 'heredar'; }
+    i.dataset.ap = p; i.dataset.sc = scope;
+    i.onchange = i.oninput = () => {
+      let v = i.value;
+      if (kind === 'num') { if (v === '') { if (!inh) return; } else if (isNaN(+v)) return; else v = +v; }
+      set(p, v);
+    };
+    w.append(i); box.append(w);
+  };
+  if (full && !inh) F('mode', 'Animar', 'sel', [['group', 'Grupo completo (todo a la vez)'], ['elements', 'Elementos individuales (uno por uno)']]);
+  F('in', 'Animación de entrada', 'sel', [...H, ...inOpts()]);
+  if (dIn) F('dirIn', 'Dirección de entrada', 'sel', [['', inh ? 'Heredar' : 'Predeterminada'], ...dIn]);
+  F('out', 'Animación de salida', 'sel', [...H, ...outOpts()]);
+  if (dOut) F('dirOut', 'Dirección de salida', 'sel', [['', inh ? 'Heredar' : 'Igual que la entrada'], ...dOut]);
+  F('inDur', 'Duración de entrada (ms)', 'num', { min: 50, max: 10000, step: 50 });
+  F('outDur', 'Duración de salida (ms)', 'num', { min: 50, max: 10000, step: 50 });
+  if (full) {
+    F('inDelay', 'Retardo de entrada (ms)', 'num', { min: 0, max: 10000, step: 50 });
+    F('outDelay', 'Retardo de salida (ms)', 'num', { min: 0, max: 10000, step: 50 });
+    if (!inh) F('speed', 'Velocidad (×, 1 = normal)', 'num', { min: .25, max: 4, step: .25 });
+    if (!inh && ga.mode === 'elements') F('stagger', 'Desfase entre elementos (ms)', 'num', { min: 0, max: 2000, step: 20 });
+  }
+}
+function syncAnim(box, a, el) {
+  box.querySelectorAll('[data-ap]').forEach(i => {
+    if (document.activeElement === i) return;
+    const p = i.dataset.ap; i.value = (i.dataset.sc === 'e' ? ((el && el.anim && el.anim[p]) ?? '') : a[p]) ?? '';
+  });
+}
+function renderAnim(box, g, full) {
+  const a = normAnim(g.anim), key = [sel, full, a.mode, a.in, a.out].join('|');
+  if (box.dataset.k !== key) { box.dataset.k = key; box.innerHTML = ''; const gr = mk$('div', full ? 'grid2' : 'grid1'); animFields(gr, 'g', null, full); box.append(gr); }
+  syncAnim(box, a, null);
+}
+function renderAnimEl(box, g) {
+  const a = normAnim(g.anim);
+  if (a.mode !== 'elements') {
+    if (box.dataset.k !== 'off') { box.dataset.k = 'off'; box.innerHTML = '<p class="hint">Elige «Elementos individuales» en «Animar» para dar a cada elemento su propia animación, retardo y duración.</p>'; }
+    return;
+  }
+  const els = elsOf(g); if (!els.some(e => e.id === animElId)) animElId = (els[0] || {}).id;
+  const el = els.find(e => e.id === animElId), ov = (el && el.anim) || {};
+  const key = ['on', sel, animElId, ov.in || '', ov.out || '', a.in, a.out, els.map(e => e.id).join()].join('|');
+  if (box.dataset.k !== key) {
+    box.dataset.k = key; box.innerHTML = '';
+    const pick = mk$('select'); els.forEach(e => { const o = mk$('option', '', `${e.name || e.type}${e.group ? ' (en grupo)' : ''}`); o.value = e.id; pick.append(o); });
+    pick.value = animElId; pick.onchange = () => { animElId = pick.value; box.dataset.k = ''; render(store.get()); };
+    const gr = mk$('div', 'grid2'); box.append(mk$('label', '', 'Elemento'), pick, gr); if (el) animFields(gr, 'e', el, true);
+  }
+  syncAnim(box, a, el);
+}
+const syncLoopBtns = () => document.querySelectorAll('[data-pv="loop"]').forEach(b => b.classList.toggle('on', loopOn));
+async function playTest(mode) { loopOn = false; syncLoopBtns(); prev.stopTest(sel); await prev.test(sel, mode); }
+async function toggleLoop() {
+  if (loopOn) { loopOn = false; syncLoopBtns(); prev.stopTest(sel); return; }
+  loopOn = true; syncLoopBtns(); const id = sel;
+  while (loopOn && sel === id) { if (!(await prev.test(id, 'both'))) break; await new Promise(r => setTimeout(r, 500)); }
+  loopOn = false; syncLoopBtns();
+}
+document.querySelectorAll('[data-pv]').forEach(b => b.onclick = () => b.dataset.pv === 'loop' ? toggleLoop() : playTest(b.dataset.pv));
 
 // ---------- Imágenes (PNG / JPG / WebP) ----------
 function pickImage(cb) {
@@ -97,15 +242,26 @@ const applyImage = (id, r, resize) => edit(id, e => { e.src = r.src; e.ar = r.ar
 // ---------- Pestaña Diseño: lista, altas y propiedades ----------
 const ICON = { text: 'T', image: '▣', shape: '▭', ticker: '≡' };
 function renderList(g) {
-  const box = $('elList'), els = arr(g.elements);
-  const key = [sel, selIds[sel], els.map(e => e.id + e.name + (e.on === false)).join()].join('|');
+  const box = $('elList'), els = elsOf(g), s = S(), groups = grpOf(g);
+  const key = [sel, s.id, s.grp, [...s.multi].join(), els.map(e => [e.id, e.name, e.on === false, e.group, e.locked].join(':')).join(),
+    Object.entries(groups).map(([k, v]) => k + v.name + v.locked).join()].join('|');
   if (box.dataset.k === key) return; box.dataset.k = key; box.innerHTML = '';
-  els.slice().reverse().forEach(e => {
-    const r = mk$('div', 'erow' + (e.id === selIds[sel] ? ' on' : '') + (e.on === false ? ' off' : ''), `${ICON[e.type] || '?'}  ${e.name || e.type}`);
-    r.onclick = () => { selIds[sel] = e.id; render(store.get()); }; box.append(r);
+  const rev = els.slice().reverse(), done = new Set();
+  const row = (e, child) => {
+    const r = mk$('div', 'erow' + (child ? ' child' : '') + (s.multi.has(e.id) ? (s.grp ? ' in' : ' on') : '') + (e.on === false ? ' off' : ''),
+      `${ICON[e.type] || '?'}  ${e.name || e.type}${e.locked ? ' 🔒' : ''}`);
+    r.onclick = ev => { if (ev.shiftKey || ev.ctrlKey || ev.metaKey) toggleMulti(e.id); else selectOne(e.id); }; box.append(r);
+  };
+  rev.forEach(e => {
+    if (e.group && groups[e.group]) {
+      if (done.has(e.group)) return; done.add(e.group);
+      const m = rev.filter(x => x.group === e.group), meta = groups[e.group];
+      const h = mk$('div', 'erow grp' + (s.grp === e.group ? ' on' : ''), `📁  ${meta.name || 'Grupo'} (${m.length})${meta.locked ? ' 🔒' : ''}`);
+      h.onclick = () => selectGroup(e.group); box.append(h); m.forEach(x => row(x, true));
+    } else row(e, false);
   });
 }
-const addEl = e => { store.mutate(sel, g => g.elements.push(e)); selIds[sel] = e.id; render(store.get()); };
+const addEl = e => { store.mutate(sel, g => g.elements.push(e)); selectOne(e.id); };
 $('addText').onclick = () => addEl(newText());
 $('addShape').onclick = () => addEl(newShape());
 $('addTicker').onclick = () => addEl(newTicker());
@@ -113,8 +269,82 @@ $('addLogo').onclick = () => { const e = newLogo(); addEl(e); pickImage(r => app
 $('addImg').onclick = () => { const e = newImage(); addEl(e); pickImage(r => applyImage(e.id, r, true)); };
 $('tSave').onclick = () => {
   const name = $('tName').value.trim(), g = draftOf(); if (!name) { alert('Escribe un nombre para la plantilla.'); return; }
-  store.saveTemplate({ name, desc: 'Plantilla personalizada', elements: clone(g.elements), anim: clone(g.anim) }); $('tName').value = '';
+  store.saveTemplate({ name, desc: 'Plantilla personalizada', elements: clone(g.elements), groups: clone(g.groups || {}), anim: clone(g.anim) }); $('tName').value = '';
 };
+
+// ---------- Grupos, bloqueo y alineación ----------
+$('gAll').onclick = () => { const s = S(), ids = elsOf(draftOf()).filter(e => e.on !== false).map(e => e.id); s.grp = null; s.multi = new Set(ids); s.id = ids[ids.length - 1] || null; render(store.get()); };
+$('gGroup').onclick = () => {
+  const ids = [...S().multi]; if (ids.length < 2) { alert('Selecciona al menos 2 elementos (Mayús + clic en la lista o en PREVIEW).'); return; }
+  const gid = uid();
+  store.mutate(sel, g => {
+    g.groups = g.groups || {}; g.groups[gid] = { name: 'Grupo ' + (Object.keys(g.groups).length + 1), locked: false };
+    g.elements.forEach(e => { if (ids.includes(e.id)) e.group = gid; }); cleanGroups(g);
+  });
+  selectGroup(gid);
+};
+$('gUngroup').onclick = () => {
+  const gid = activeGroup(); if (!gid) return;
+  const ids = elsOf(draftOf()).filter(e => e.group === gid).map(e => e.id);
+  store.mutate(sel, g => { g.elements.forEach(e => { if (e.group === gid) delete e.group; }); if (g.groups) delete g.groups[gid]; });
+  const s = S(); s.grp = null; s.multi = new Set(ids); render(store.get());
+};
+$('gDup').onclick = () => {
+  const gid = activeGroup(); if (!gid) return; const ngid = uid();
+  store.mutate(sel, g => {
+    const meta = (g.groups || {})[gid] || {}; g.groups = g.groups || {}; g.groups[ngid] = { name: (meta.name || 'Grupo') + ' (copia)', locked: false };
+    g.elements.filter(e => e.group === gid).forEach(e => { const c = clone(e); c.id = uid(); c.group = ngid; c.x += 30; c.y += 30; g.elements.push(c); });
+  });
+  selectGroup(ngid);
+};
+$('gLock').onclick = () => {
+  const s = S();
+  if (s.grp) store.mutate(sel, g => { const m = (g.groups || {})[s.grp]; if (m) m.locked = !m.locked; }, { preview: false });
+  else { const t = target(), lock = !t.els.some(e => e.locked); store.mutate(sel, g => g.elements.forEach(e => { if (t.els.some(x => x.id === e.id)) e.locked = lock; }), { preview: false }); }
+};
+$('gName').oninput = () => { const gid = S().grp; if (gid) store.mutate(sel, g => { if (g.groups && g.groups[gid]) g.groups[gid].name = $('gName').value; }); };
+
+const ALIGNS = [['left', '⇤ Izquierda'], ['hc', '↔ Centro H'], ['right', 'Derecha ⇥'], ['top', '⤒ Arriba'], ['vc', '↕ Centro V'], ['bottom', 'Abajo ⤓']];
+const ALIGN = {
+  left: (r, R) => ({ dx: R.x - r.x }), hc: (r, R) => ({ dx: R.x + R.w / 2 - (r.x + r.w / 2) }), right: (r, R) => ({ dx: R.x + R.w - (r.x + r.w) }),
+  top: (r, R) => ({ dy: R.y - r.y }), vc: (r, R) => ({ dy: R.y + R.h / 2 - (r.y + r.h / 2) }), bottom: (r, R) => ({ dy: R.y + R.h - (r.y + r.h) })
+};
+function align(mode) {
+  const t = target(), g = draftOf(); if (!t.els.length || isLocked(g, t)) return;
+  const multi = !t.group && t.els.length > 1, ref = multi && $('alignRef').value === 'sel' ? bb(t.els) : STAGE;
+  store.mutate(sel, g2 => {
+    const els = g2.elements.filter(e => t.els.some(x => x.id === e.id));
+    const move = (list, r) => { const d = ALIGN[mode](r, ref); list.forEach(e => { e.x = Math.round(e.x + (d.dx || 0)); e.y = Math.round(e.y + (d.dy || 0)); }); };
+    if (multi) els.forEach(e => move([e], e)); else move(els, bb(els));   // un grupo o un elemento se alinea como una sola pieza
+  });
+}
+function distribute(axis) {
+  const t = target(), g = draftOf();
+  if (t.group || t.els.length < 3) { alert('Selecciona 3 o más elementos sueltos (Mayús + clic) para distribuirlos.'); return; }
+  if (isLocked(g, t)) return;
+  store.mutate(sel, g2 => {
+    const P = axis === 'h' ? ['x', 'w'] : ['y', 'h'], els = g2.elements.filter(e => t.els.some(x => x.id === e.id)).sort((a, b) => a[P[0]] - b[P[0]]);
+    const first = els[0], lastE = els[els.length - 1], span = lastE[P[0]] + lastE[P[1]] - first[P[0]], total = els.reduce((s, e) => s + e[P[1]], 0);
+    const gap = (span - total) / (els.length - 1); let pos = first[P[0]];
+    els.forEach(e => { e[P[0]] = Math.round(pos); pos += e[P[1]] + gap; });
+  });
+}
+(() => {
+  const bar = $('alignBar'), add = (t, f) => { const b = mk$('button', '', t); b.onclick = f; bar.append(b); };
+  ALIGNS.forEach(([m, t]) => add(t, () => align(m))); add('⇔ Distribuir H', () => distribute('h')); add('⇕ Distribuir V', () => distribute('v'));
+})();
+function renderSelUI(g) {
+  const t = target(), s = S(), meta = s.grp ? grpOf(g)[s.grp] : null, e1 = curEl(), ag = activeGroup();
+  $('selInfo').textContent = meta ? `Grupo «${meta.name}» · ${t.els.length} elementos` : t.els.length > 1 ? `${t.els.length} elementos seleccionados (Mayús + clic para añadir o quitar)`
+    : e1 ? `Elemento: ${e1.name || e1.type}${e1.group ? ' (dentro de un grupo)' : ''}` : 'Sin selección';
+  $('gGroup').disabled = !(t.els.length > 1 && !t.group); $('gUngroup').disabled = $('gDup').disabled = !ag;
+  const lk = s.grp ? !!(meta || {}).locked : t.els.some(e => e.locked);
+  $('gLock').textContent = lk ? '🔓 Desbloquear' : '🔒 Bloquear';
+  const gn = $('gName'); gn.hidden = !s.grp; if (s.grp && document.activeElement !== gn) gn.value = (meta || {}).name || '';
+  $('alignRef').hidden = !(t.els.length > 1 && !t.group);
+  bigInfo.textContent = $('selInfo').textContent;
+  bigSync.forEach(([id, b]) => { b.textContent = $(id).textContent; b.disabled = $(id).disabled; });
+}
 
 function setProp(id, p, v) {
   edit(id, e => {
@@ -176,13 +406,13 @@ function buildNews(e) {
 function buildActions(e) {
   const a = mk$('div', 'arow'), b = (t, f, c) => { const x = mk$('button', c || '', t); x.onclick = f; a.append(x); return x; };
   if (e.type === 'image') { b('Subir / cambiar imagen', () => pickImage(r => applyImage(e.id, r, false)), 'go'); b('Quitar imagen', () => edit(e.id, x => { x.src = ''; })); }
-  b('Duplicar', () => { const c = clone(e); c.id = Math.random().toString(36).slice(2, 9); c.name = (e.name || e.type) + ' (copia)'; c.x += 30; c.y += 30; addEl(c); });
+  b('Duplicar', () => { const c = clone(e); c.id = uid(); delete c.group; c.name = (e.name || e.type) + ' (copia)'; c.x += 30; c.y += 30; addEl(c); });
   b('▲ Al frente', () => moveZ(1)); b('▼ Atrás', () => moveZ(-1));
-  b('Eliminar', () => { store.mutate(sel, g => { g.elements = g.elements.filter(x => x.id !== e.id); }); selIds[sel] = null; render(store.get()); }, 'danger');
+  b('Eliminar', () => { store.mutate(sel, g => { g.elements = g.elements.filter(x => x.id !== e.id); cleanGroups(g); }); S().id = null; render(store.get()); }, 'danger');
   return a;
 }
 function moveZ(d) {
-  store.mutate(sel, g => { const i = g.elements.findIndex(e => e.id === selIds[sel]), j = i + d; if (i < 0 || j < 0 || j >= g.elements.length) return; [g.elements[i], g.elements[j]] = [g.elements[j], g.elements[i]]; });
+  store.mutate(sel, g => { const i = g.elements.findIndex(e => e.id === S().id), j = i + d; if (i < 0 || j < 0 || j >= g.elements.length) return; [g.elements[i], g.elements[j]] = [g.elements[j], g.elements[i]]; });
 }
 function renderInsp(box, e, kind) {
   if (!e) { box.dataset.k = ''; box.innerHTML = '<p class="hint">Selecciona un elemento.</p>'; return; }
@@ -193,7 +423,7 @@ function renderInsp(box, e, kind) {
     if (kind === 'ticker') {
       box.append(buildNews(e), mk$('h3', '', 'Estilo y movimiento'), grid(SPECS.ticker, e.id), mk$('h3', '', 'Altura y posición de la cinta'), grid([['name', 'Nombre', 'text'], ...GEO], e.id));
     } else {
-      box.append(grid([['name', 'Nombre', 'text'], ['on', 'Visible', 'check'], ...GEO], e.id), mk$('h3', '', 'Aspecto'), grid(SPECS[e.type] || [], e.id));
+      box.append(grid([['name', 'Nombre', 'text'], ['on', 'Visible', 'check'], ['locked', 'Bloquear posición', 'check'], ...GEO], e.id), mk$('h3', '', 'Aspecto'), grid(SPECS[e.type] || [], e.id));
       if (e.type === 'ticker') box.append(mk$('p', 'hint', 'Las noticias se editan en la pestaña Cintilla.'));
     }
     if (kind !== 'ticker') box.append(buildActions(e));
@@ -206,6 +436,27 @@ function renderInsp(box, e, kind) {
   });
   box.querySelectorAll('[data-news]').forEach(i => { if (document.activeElement !== i) i.value = arr(e.items)[+i.dataset.news] ?? ''; });
 }
+function groupGeo(p, v) {   // X / Y / Ancho / Alto de un grupo o selección múltiple (el tamaño mantiene proporciones)
+  if (!isFinite(v)) return; const t = target(), g = draftOf(); if (!t.els.length || isLocked(g, t)) return;
+  const snap = t.els.map(clone), b = bb(snap);
+  store.mutate(sel, g2 => snap.forEach(o => {
+    const e = byId(g2, o.id); if (!e) return;
+    if (p === 'x') e.x = Math.round(o.x + v - b.x); else if (p === 'y') e.y = Math.round(o.y + v - b.y);
+    else scaleEl(e, o, b.x, b.y, Math.max(.05, p === 'w' ? v / b.w : v / b.h));
+  }));
+}
+function renderMultiInsp(box, t) {
+  const key = ['mul', sel, t.group || '', t.els.map(e => e.id).join()].join('|');
+  if (box.dataset.k !== key) {
+    box.dataset.k = key; box.innerHTML = '';
+    box.append(mk$('h3', '', t.group ? 'Grupo' : 'Selección múltiple'),
+      mk$('p', 'hint', 'Mover, redimensionar (mantiene proporciones) y alinear actúan sobre toda la composición. Doble clic en PREVIEW (o clic en el elemento de la lista) para editar un elemento suelto.'));
+    const gr = mk$('div', 'grid2');
+    [['x', 'X (px)'], ['y', 'Y (px)'], ['w', 'Ancho (px)'], ['h', 'Alto (px)']].forEach(([p, l]) => { const w = mk$('div', 'f'), i = mk$('input'); i.type = 'number'; i.dataset.gp = p; i.onchange = () => groupGeo(p, +i.value); w.append(mk$('label', '', l), i); gr.append(w); });
+    box.append(gr);
+  }
+  const b = bb(t.els); box.querySelectorAll('[data-gp]').forEach(i => { if (document.activeElement !== i) i.value = Math.round(b[i.dataset.gp]); });
+}
 function renderTickerTab(g) {
   const box = $('tkInsp'), tk = tickerOf(g);
   if (!tk) {
@@ -216,44 +467,75 @@ function renderTickerTab(g) {
 }
 
 // ---------- Selección y movimiento directo en PREVIEW ----------
-const ovl = mk$('div', 'ovl'); ovl.append(mk$('div', 'hd')); prev.el.append(ovl);
+const ovl = mk$('div', 'ovl'), lbl = mk$('div', 'lbl'), hd = mk$('div', 'hd'), hov = mk$('div', 'hov'), pool = [];
+ovl.append(lbl, hd); prev.el.append(ovl, hov);
+function outline(i, r) {
+  let d = pool[i]; if (!d) { d = mk$('div', 'ovl2'); prev.el.append(d); pool[i] = d; }
+  Object.assign(d.style, { display: 'block', left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px' });
+}
 function drawOvl() {
-  const e = curEl();
-  if (tab !== 'design' || !e) { ovl.style.display = 'none'; return; }
-  Object.assign(ovl.style, { display: 'block', left: e.x + 'px', top: e.y + 'px', width: e.w + 'px', height: e.h + 'px' });
+  const g = draftOf(), t = target(); pool.forEach(d => d.style.display = 'none');
+  if (tab !== 'design' || !g || !t.els.length) { ovl.style.display = 'none'; hov.style.display = 'none'; return; }
+  const b = bb(t.els), lk = isLocked(g, t), multi = t.els.length > 1;
+  ovl.className = 'ovl' + (t.group ? ' grp' : multi ? ' multi' : '') + (lk ? ' lock' : '');
+  Object.assign(ovl.style, { display: 'block', left: b.x + 'px', top: b.y + 'px', width: b.w + 'px', height: b.h + 'px' });
+  lbl.textContent = (lk ? '🔒 ' : '') + (t.group ? 'GRUPO: ' + ((grpOf(g)[t.group] || {}).name || '') : multi ? t.els.length + ' ELEMENTOS' : (t.els[0].name || t.els[0].type));
+  lbl.style.top = b.y < 70 ? '10px' : '-54px'; lbl.style.left = '6px'; hd.style.display = lk ? 'none' : 'block';
+  if (multi) t.els.forEach((e, i) => outline(i, e));
+}
+function hitAt(ev) {   // elemento visible más alto bajo el puntero
+  const g = draftOf(); if (!g) return null;
+  const r = prev.el.getBoundingClientRect(), k = 1 / prev.scale(), px = (ev.clientX - r.left) * k, py = (ev.clientY - r.top) * k;
+  return elsOf(g).slice().reverse().find(e => e.on !== false && px >= e.x && px <= e.x + e.w && py >= e.y && py <= e.y + e.h) || null;
 }
 let drag = null;
 ovl.addEventListener('pointerdown', ev => {
-  const e = curEl(); if (!e) return;
-  drag = { rs: ev.target.classList.contains('hd'), sx: ev.clientX, sy: ev.clientY, x: e.x, y: e.y, w: e.w, h: e.h, type: e.type, lock: e.lock !== false };
+  const g = draftOf(), t = target(); if (!t.els.length || isLocked(g, t)) return;
+  drag = { rs: ev.target.classList.contains('hd'), sx: ev.clientX, sy: ev.clientY, snap: t.els.map(clone), box: bb(t.els), single: !t.group && t.els.length === 1 };
   ovl.setPointerCapture(ev.pointerId); ev.preventDefault();
 });
 ovl.addEventListener('pointermove', ev => {
   if (!drag) return;
   const k = 1 / prev.scale(), dx = (ev.clientX - drag.sx) * k, dy = (ev.clientY - drag.sy) * k;
-  store.mutate(sel, g => {
-    const e = g.elements.find(x => x.id === selIds[sel]); if (!e) return;
-    if (!drag.rs) { e.x = Math.round(drag.x + dx); e.y = Math.round(drag.y + dy); return; }
-    let w = Math.max(10, Math.round(drag.w + dx)), h = Math.max(10, Math.round(drag.h + dy));
-    if ((drag.type === 'image' && drag.lock) || ev.shiftKey) h = Math.max(10, Math.round(w * drag.h / drag.w));
-    e.w = w; e.h = h;
+  store.mutate(sel, g => {   // todo se calcula desde el estado inicial: las posiciones relativas no se pierden
+    if (!drag.rs) { drag.snap.forEach(o => { const e = byId(g, o.id); if (e) { e.x = Math.round(o.x + dx); e.y = Math.round(o.y + dy); } }); return; }
+    if (drag.single) {
+      const o = drag.snap[0], e = byId(g, o.id); if (!e) return;
+      let w = Math.max(10, Math.round(o.w + dx)), h = Math.max(10, Math.round(o.h + dy));
+      if ((o.type === 'image' && o.lock !== false) || ev.shiftKey) h = Math.max(10, Math.round(w * o.h / o.w));
+      e.w = w; e.h = h; return;
+    }
+    const kk = Math.max(.05, (drag.box.w + dx) / drag.box.w);   // grupo o selección múltiple: siempre proporcional
+    drag.snap.forEach(o => { const e = byId(g, o.id); if (e) scaleEl(e, o, drag.box.x, drag.box.y, kk); });
   });
 });
 ovl.addEventListener('pointerup', () => { drag = null; });
-prev.el.addEventListener('pointerdown', ev => {   // clic en el PREVIEW selecciona el elemento que hay debajo
+prev.el.addEventListener('pointerdown', ev => {   // clic en el PREVIEW selecciona lo que hay debajo
   if (tab !== 'design' || ev.target.closest('.ovl')) return;
-  const g = draftOf(), r = prev.el.getBoundingClientRect(), k = 1 / prev.scale();
-  const px = (ev.clientX - r.left) * k, py = (ev.clientY - r.top) * k;
-  const hit = arr(g.elements).slice().reverse().find(e => e.on !== false && px >= e.x && px <= e.x + e.w && py >= e.y && py <= e.y + e.h);
-  if (hit) { selIds[sel] = hit.id; render(store.get()); }
+  const h = hitAt(ev); if (!h) return;
+  if (ev.shiftKey || ev.ctrlKey || ev.metaKey) toggleMulti(h.id);
+  else if (h.group && grpOf(draftOf())[h.group]) selectGroup(h.group); else selectOne(h.id);
+});
+prev.el.addEventListener('dblclick', ev => { if (tab !== 'design') return; const h = hitAt(ev); if (h) selectOne(h.id); });   // doble clic: elemento suelto dentro de un grupo
+prev.el.addEventListener('pointermove', ev => {
+  if (tab !== 'design' || drag) { hov.style.display = 'none'; return; }
+  const h = hitAt(ev); if (!h || S().multi.has(h.id)) { hov.style.display = 'none'; return; }
+  Object.assign(hov.style, { display: 'block', left: h.x + 'px', top: h.y + 'px', width: h.w + 'px', height: h.h + 'px' });
+});
+prev.el.addEventListener('pointerleave', () => { hov.style.display = 'none'; });
+addEventListener('keydown', ev => {   // flechas: mover 1 px (Mayús = 10 px) lo seleccionado
+  if (tab !== 'design' || /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '')) return;
+  const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[ev.key]; if (!d) return;
+  const t = target(); if (!t.els.length || isLocked(draftOf(), t)) return; ev.preventDefault();
+  const m = ev.shiftKey ? 10 : 1; store.mutate(sel, g => g.elements.forEach(e => { if (t.els.some(x => x.id === e.id)) { e.x += d[0] * m; e.y += d[1] * m; } }));
 });
 
 // ---------- Titulares guardados ----------
 function snapshot(withDesign) {
   const g = draftOf(), texts = {};
-  arr(g.elements).forEach(e => { if (e.type === 'text' && e.role && !(e.role in texts)) texts[e.role] = e.text; });
+  elsOf(g).forEach(e => { if (e.type === 'text' && e.role && !(e.role in texts)) texts[e.role] = e.text; });
   const rec = { texts, slot: sel };
-  if (withDesign) rec.design = { template: g.template, elements: clone(g.elements), anim: clone(g.anim) };
+  if (withDesign) rec.design = { template: g.template, elements: clone(g.elements), groups: clone(g.groups || {}), anim: clone(g.anim) };
   return rec;
 }
 function loadHeadline(h) {
@@ -295,7 +577,8 @@ function renderSaved() {
 // ---------- Plantillas ----------
 let tplKey = null;
 function useTemplate(t) {
-  store.setGraphic(sel, instantiate(t, draftOf())); selIds[sel] = null; $('fields').dataset.k = ''; render(store.get());
+  if (t.key === 'blank' && elsOf(draftOf()).length && !confirm('Se quitarán todos los elementos de este gráfico para empezar en blanco. ¿Continuar?')) return;
+  store.setGraphic(sel, instantiate(t, draftOf())); const s = S(); s.id = null; s.grp = null; s.multi = new Set(); $('fields').dataset.k = ''; render(store.get());
 }
 function addCard(grid, t, del) {
   const c = mk$('div', 'tcard'), th = mk$('div', 'thumb'); c.append(th); grid.append(c);
@@ -314,15 +597,36 @@ function renderTpl() {
   mine.forEach(t => addCard($('tplMine'), t, true));
 }
 
+// ---------- Vista previa grande (pestaña Diseño) ----------
+const pvBox = $('pvBox'), bigSync = [], bigInfo = mk$('span', 'binfo');
+function closeBig() { pvBox.classList.remove('big'); $('bigBar').hidden = true; $('bigOpen').textContent = '⤢ Ampliar'; }
+function toggleBig() {
+  if (pvBox.classList.contains('big')) { closeBig(); return; }
+  if (tab !== 'design') return;
+  pvBox.classList.add('big'); $('bigBar').hidden = false; $('bigOpen').textContent = '✕ Cerrar (Esc)';
+}
+$('bigOpen').onclick = $('bigPv').onclick = toggleBig;
+addEventListener('keydown', ev => { if (ev.key === 'Escape') closeBig(); });
+(() => {
+  const bar = $('bigBar'), mkb = (t, f) => { const b = mk$('button', '', t); b.onclick = f; bar.append(b); return b; };
+  bar.append(bigInfo);
+  ['gAll', 'gGroup', 'gUngroup', 'gDup', 'gLock'].forEach(id => bigSync.push([id, mkb('', () => $(id).click())]));
+  bar.append(mk$('span', 'bsep'));
+  ALIGNS.forEach(([m, t]) => mkb(t, () => align(m))); mkb('⇔ Distribuir H', () => distribute('h')); mkb('⇕ Distribuir V', () => distribute('v'));
+})();
+
 // ---------- Render general ----------
 function render(s) {
-  prev.apply(s.draft); prog.apply(s.program); buildQuick(s);
+  if (!SLOTS[sel]) sel = 'headline';
+  prev.apply(s.draft); prog.apply(s.program); buildAirpad(s);
   const g = s.draft[sel]; if (!g) return;
-  const els = arr(g.elements);
-  if (!els.some(e => e.id === selIds[sel])) selIds[sel] = (els.find(e => e.type === 'text') || els[0] || {}).id;
-  buildLive(s);
-  if (tab === 'op') syncContent(g);
-  if (tab === 'design') { renderList(g); renderInsp($('insp'), curEl(), 'design'); }
+  fixSel(g); buildLive(s);
+  if (tab === 'op') { syncContent(g); renderAnim($('animQuick'), g, false); }
+  if (tab === 'design') {
+    renderList(g); renderSelUI(g);
+    const t = target(); if (t.els.length > 1) renderMultiInsp($('insp'), t); else renderInsp($('insp'), curEl(), 'design');
+  }
+  if (tab === 'anim') { renderAnim($('animFull'), g, true); renderAnimEl($('animEl'), g); }
   if (tab === 'ticker') renderTickerTab(g);
   if (tab === 'saved') renderSaved();
   if (tab === 'tpl') renderTpl();

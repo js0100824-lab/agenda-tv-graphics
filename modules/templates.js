@@ -11,6 +11,13 @@ export const SLOTS = {
   nameplate: { name: 'Nombre / cargo',    tpl: 'nameplate' }
 };
 
+// Gráficos adicionales creados por el usuario (se guardan en /slots y se suman a los tres integrados)
+export function setCustomSlots(map) {
+  for (const k of Object.keys(SLOTS)) if (SLOTS[k].custom) delete SLOTS[k];
+  Object.entries(map || {}).filter(([, v]) => v).sort((a, b) => (a[1].ts || 0) - (b[1].ts || 0))
+    .forEach(([id, v]) => { if (!SLOTS[id]) SLOTS[id] = { name: v.name || 'Gráfico', tpl: 'blank', custom: true }; });
+}
+
 export const uid = () => Math.random().toString(36).slice(2, 9);
 export const arr = v => Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v) : []);
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -39,6 +46,8 @@ export const newTicker = () => K(uid(), 'Cintilla', 0, 980, 1920, 100);
 // ---------- Biblioteca de plantillas (estilos de canal informativo) ----------
 export const TEMPLATES = {};
 const def = (key, name, desc, anim, elements) => { TEMPLATES[key] = { key, name, desc, anim, elements }; };
+
+def('blank', 'En blanco', 'Sin ningún elemento: parte de cero y crea tu propio diseño', { in: 'fade', duration: 600 }, []);
 
 def('logo_titulo', 'Logo + título', 'Panel azul institucional con logotipo a la izquierda', { in: 'left', duration: 700 }, [
   S('panel', 'Panel', 80, 830, 1760, 150, '#0b1f4d', { opacity: .96 }),
@@ -121,7 +130,7 @@ export function instantiate(tpl, prev) {
     if (e.type === 'ticker' && oldTk) e.items = clone(arr(oldTk.items));
     if (e.type === 'image' && e.role === 'logo' && !e.src && oldLogo) { e.src = oldLogo.src; e.ar = oldLogo.ar; }
   });
-  return { template: tpl.key || 'custom', elements: els, anim: clone(tpl.anim || { in: 'left', duration: 700 }) };
+  return { template: tpl.key || 'custom', elements: els, groups: clone(tpl.groups || {}), anim: clone(tpl.anim || { in: 'left', duration: 700 }) };
 }
 
 export function newGraphic(id) {

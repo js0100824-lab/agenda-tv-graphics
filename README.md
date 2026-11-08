@@ -15,3 +15,10 @@ Sin `databaseURL` funciona en modo local (mismo navegador), solo para pruebas.
 - **Titulares guardados** (sin categorías): guardar con nombre, editar, duplicar, eliminar, buscar y cargar; opcionalmente con todo su diseño y cintilla.
 - Todo se sincroniza con `/program` en tiempo real, con fondo transparente. Datos nuevos: `/headlines` y `/templates`.
 - Los datos antiguos de la Fase 1 (sin elementos) se ignoran y se sustituyen por plantillas nuevas.
+
+## Animaciones, grupos y salida al aire
+- **Entrada y salida** equivalentes (inversa por defecto o la que elijas), con 16 animaciones, dirección, duración, retardo y velocidad; por grupo completo o por elemento. Pruebas en PREVIEW: ▶ Entrada, ▶ Salida, ▶ Ambas, ⟲ Repetir.
+- **Grupos**: Mayús + clic para multiselección; Agrupar, Desagrupar, Duplicar, Bloquear; mover y escalar con proporciones; doble clic entra en un grupo. **Alinear** y distribuir; flechas del teclado para ajuste fino.
+- **Vista previa grande** (pestaña Diseño): botón «⤢ Ampliar»; Esc para cerrar.
+- **Plantilla «En blanco»** (sin elementos) en Plantillas y botón «Empezar en blanco» en Diseño.
+- **SALIDA AL AIRE**: un botón grande por gráfico (clic = mostrar y se pone en rojo; otro clic = ocultar). «+ Añadir gráfico» crea más (datos en `/slots`); se apilan en filas de tres.

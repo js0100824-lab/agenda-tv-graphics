@@ -1,9 +1,9 @@
 // Estado central: /draft (lo que editas y ves en PREVIEW) y /program (lo que ve OBS).
 // Además: /headlines (titulares guardados) y /templates (plantillas personalizadas).
 import * as db from './firebase.js';
-import { SLOTS, newGraphic, arr, uid } from './templates.js';
+import { SLOTS, newGraphic, arr, uid, setCustomSlots } from './templates.js';
 
-const state = { draft: {}, program: {}, headlines: {}, templates: {} };
+const state = { draft: {}, program: {}, headlines: {}, templates: {}, slots: {} };
 const subs = new Set();
 const emit = () => subs.forEach(f => f(state));
 export const subscribe = f => { subs.add(f); f(state); };
@@ -31,16 +31,25 @@ function fixLib(v) {
 
 export async function init() {
   await db.connect();
-  db.watch('draft', v => { state.draft = fixGraphics(v, true); emit(); });
+  db.watch('slots', v => {   // gráficos adicionales (además de los tres integrados)
+    state.slots = v || {}; setCustomSlots(state.slots);
+    for (const id in SLOTS) if (!state.draft[id]) state.draft[id] = newGraphic(id);
+    emit();
+  });
+  db.watch('draft', v => {   // no pisar con datos remotos lo que se está editando y aún no se ha guardado
+    const n = fixGraphics(v, true);
+    for (const id in pending) if (pending[id] && state.draft[id]) n[id] = state.draft[id];
+    state.draft = n; emit();
+  });
   db.watch('program', v => { state.program = fixGraphics(v, false); emit(); });
   db.watch('headlines', v => { state.headlines = fixLib(v); emit(); });
   db.watch('templates', v => { state.templates = fixLib(v); emit(); });
 }
 
-const timers = {};
+const timers = {}, pending = {};
 function saveDraft(id) {   // guardado con pequeño retardo mientras se escribe o se arrastra
-  clearTimeout(timers[id]);
-  timers[id] = setTimeout(() => db.set(`draft/${id}`, state.draft[id]), 250);
+  pending[id] = true; clearTimeout(timers[id]);
+  timers[id] = setTimeout(() => { pending[id] = false; db.set(`draft/${id}`, state.draft[id]); }, 250);
 }
 // Modifica el borrador. Por defecto lo deja visible en PREVIEW para ver el cambio al instante.
 export function mutate(id, fn, { preview = true } = {}) {
@@ -79,6 +88,21 @@ export function live(id, elId, patch) {
   const i = arr(pg.elements).findIndex(x => x.id === elId); if (i < 0) return;
   for (const k in patch) { pg.elements[i][k] = patch[k]; db.set(`program/${id}/elements/${i}/${k}`, patch[k]); }
   emit();
+}
+
+// ---------- Gráficos adicionales ----------
+export function addSlot(name) {
+  const id = uid(), rec = { name, ts: Date.now() };
+  state.slots[id] = rec; setCustomSlots(state.slots); state.draft[id] = newGraphic(id); emit();
+  db.set(`slots/${id}`, rec); db.set(`draft/${id}`, state.draft[id]); return id;
+}
+export function renameSlot(id, name) {
+  if (!state.slots[id]) return; state.slots[id].name = name; setCustomSlots(state.slots); emit(); return db.set(`slots/${id}/name`, name);
+}
+export async function removeSlot(id) {
+  if (!SLOTS[id] || !SLOTS[id].custom) return;
+  delete state.slots[id]; setCustomSlots(state.slots); delete state.draft[id]; delete state.program[id]; emit();
+  await db.set(`program/${id}`, null); await db.set(`draft/${id}`, null); return db.set(`slots/${id}`, null);
 }
 
 // ---------- Titulares guardados y plantillas personalizadas ----------
