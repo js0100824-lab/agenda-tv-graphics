@@ -249,3 +249,6 @@ main.nosrc #opMain,main.nosrc #tab-design>*,main.nosrc #tab-ticker>*,main.nosrc 
 .sdbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sdbtns .grow{flex:1}
 .sdbtns button{padding:8px 14px;border:0;border-radius:4px;background:#2a3340;color:#fff;cursor:pointer;font-weight:600}
 .sdbtns button:disabled{opacity:.45;cursor:not-allowed}
+
+.swmgr .gone{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.swmgr .gone .hint{margin:0;flex-basis:100%}
+.swmgr .gone button{padding:7px 12px;border:0;border-radius:4px;background:#2a3340;color:#fff;cursor:pointer;font-weight:600}

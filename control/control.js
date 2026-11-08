@@ -1,7 +1,7 @@
 import * as store from '../modules/store.js';
 import * as db from '../modules/firebase.js';
 import { createStage } from '../modules/stage.js';
-import { SLOTS, isBuiltin, TEMPLATES, TEMPLATE_LIST, FONTS, arr, uid, layerOf, instantiate, newText, newImage, newLogo, newShape, newTicker, newClock } from '../modules/templates.js';
+import { SLOTS, DEFAULT_NAMES, isBuiltin, TEMPLATES, TEMPLATE_LIST, FONTS, arr, uid, layerOf, instantiate, newText, newImage, newLogo, newShape, newTicker, newClock } from '../modules/templates.js';
 import { CATALOG, normAnim, outKey } from '../modules/animations.js';
 
 const $ = id => document.getElementById(id);
@@ -11,9 +11,9 @@ const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '
 const mk$ = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 const prev = createStage($('mPrev'), { placeholders: true }), prog = createStage($('mProg'));
-const ed = createStage($('mEd'), { placeholders: true, static: true });   // editor propio de la pestaña Diseño (independiente de PREVIEW y PROGRAMA)
+const ed = createStage($('mEd'), { placeholders: true, static: true });   // editor propio de la pestaña Editor (independiente de PREVIEW y PROGRAMA)
 let sel = Object.keys(SLOTS)[0] || null, tab = 'op', editingH = null, loopOn = false, animElId = null;
-let open = new Set(sel ? [sel] : []);   // gráficos abiertos juntos en el editor de Diseño; «sel» es el activo (el que muestran la lista y las propiedades)
+let open = new Set(sel ? [sel] : []);   // gráficos abiertos juntos en la pestaña Editor; «sel» es el activo (el que muestran la lista y las propiedades)
 const STAGE = { x: 0, y: 0, w: 1920, h: 1080 };
 
 // ---------- Selección: un elemento, varios (Mayús + clic) o un grupo completo ----------
@@ -85,8 +85,8 @@ function setTab(t) {
   tab = t;
   document.querySelectorAll('#nav a').forEach(x => x.classList.toggle('on', x.dataset.tab === t));
   document.querySelectorAll('.tab').forEach(x => x.hidden = x.id !== 'tab-' + t);
-  $('main').classList.toggle('dsg', t === 'design');   // en pantallas grandes Diseño ocupa la pantalla sin desplazar toda la página
-  store.setAutoPreview(t !== 'design');   // en Diseño, editar NO enciende el switch de PREVIEW
+  $('main').classList.toggle('dsg', t === 'design');   // en pantallas grandes Editor ocupa la pantalla sin desplazar toda la página
+  store.setAutoPreview(t !== 'design');   // en Editor, editar NO enciende el switch de PREVIEW
   hideCtx(); render(store.get());
 }
 document.querySelectorAll('#nav a').forEach(a => a.onclick = () => setTab(a.dataset.tab));
@@ -120,7 +120,7 @@ function buildEditbar() {
 }
 function buildAirpad(s) {
   const ids = Object.keys(SLOTS), live = id => !!(s.program[id] && s.program[id].visible), view = id => !!(s.draft[id] && s.draft[id].visible);
-  const key = ids.map(id => [id, SLOTS[id].name, live(id), view(id), id === sel].join(':')).join('|'), rows = $('swProg');
+  const key = ids.map(id => [id, SLOTS[id].name, live(id), view(id), id === sel].join(':')).join('|') + '#' + store.closedBuiltins().join(), rows = $('swProg');
   if (rows.dataset.k === key) return; rows.dataset.k = key;
   [['swProg', true], ['swPrev', false]].forEach(([rid, isProg]) => {
     const row = $(rid); row.innerHTML = '';
@@ -146,13 +146,21 @@ function buildAirpad(s) {
     inp.onchange = () => { const n = inp.value.trim(); if (n && n !== SLOTS[id].name) store.renameSlot(id, n); else inp.value = SLOTS[id].name; };
     inp.onkeydown = e => { if (e.key === 'Enter') inp.blur(); };
     r.append(mk$('div', 'grip'), inp);
-    if (SLOTS[id].custom) {
-      const x = mk$('button', 'danger', 'Eliminar');
-      x.onclick = () => { if (confirm(`¿Eliminar la fuente «${SLOTS[id].name}»? Se borra también su diseño.`)) { if (sel === id) selectSlot(Object.keys(SLOTS).find(k => k !== id) || null); store.removeSlot(id); } };
-      r.append(x);
-    }
-    list.append(r);
+    const x = mk$('button', 'danger', 'Eliminar');
+    x.onclick = () => {
+      const sv = store.sourceProgram(id) ? ' Sigue guardada en su programa.' : ' Si no está guardada en un programa, se pierde su diseño.';
+      if (!confirm(`¿Eliminar la fuente «${SLOTS[id].name}»? Sale de Operación y del aire.${sv}`)) return;
+      if (sel === id) selectSlot(Object.keys(SLOTS).find(k => k !== id) || null);
+      if (SLOTS[id].custom) store.removeSlot(id); else store.closeSources([id]);
+    };
+    r.append(x); list.append(r);
   });
+  const gone = store.closedBuiltins();   // fuentes integradas eliminadas o guardadas: se pueden traer de nuevo en blanco
+  if (gone.length) {
+    const box = mk$('div', 'gone'); box.append(mk$('p', 'hint', 'Fuentes cerradas o eliminadas (vuelven a su lugar en los switches):'));
+    gone.forEach(id => { const b = mk$('button', '', 'Restaurar «' + DEFAULT_NAMES[id] + '» en blanco'); b.onclick = async () => { await store.restoreBuiltin(id); selectSlot(id); }; box.append(b); });
+    mg.append(box);
+  }
   sortRows(list, ids, (id, to) => store.moveSlot(id, to));
 }
 // Reordenar filas arrastrando (ratón o dedo): la fila sigue al puntero y las demás se apartan; al soltar se guarda el nuevo orden.
@@ -179,7 +187,7 @@ function sortRows(list, ids, onMove) {
 $('edRename').onclick = () => { if (!SLOTS[sel]) return; const n = (prompt('Nuevo nombre de la fuente:', SLOTS[sel].name) || '').trim(); if (n) store.renameSlot(sel, n); };
 $('slotAdd').onclick = () => {
   const name = (prompt('Nombre de la nueva fuente (por ejemplo: Marcador, Reloj, Logo):') || '').trim(); if (!name) return;
-  selectSlot(store.addSlot(name));   // nuevo gráfico en blanco: aparece en los switches; se diseña en Diseño o Plantillas
+  selectSlot(store.addSlot(name));   // nuevo gráfico en blanco: aparece en los switches; se diseña en Editor o Plantillas
 };
 let swOpen = false;
 $('swToggle').onclick = () => {
@@ -209,7 +217,7 @@ function syncContent(g) {
   if (box.dataset.k !== key) {
     box.dataset.k = key; box.innerHTML = '';
     texts.forEach(e => { const t = mk$('textarea'); t.rows = 2; t.dataset.id = e.id; t.oninput = () => edit(e.id, x => { x.text = t.value; }); box.append(mk$('label', '', e.name || 'Texto'), t); });
-    if (!texts.length) box.innerHTML = '<p class="hint">Esta fuente no tiene cuadros de texto. Puedes añadirlos en la pestaña Diseño.</p>';
+    if (!texts.length) box.innerHTML = '<p class="hint">Esta fuente no tiene cuadros de texto. Puedes añadirlos en la pestaña Editor.</p>';
   }
   box.querySelectorAll('textarea').forEach(t => { const e = texts.find(x => x.id === t.dataset.id); if (e && document.activeElement !== t) t.value = e.text ?? ''; });
 }
@@ -901,7 +909,7 @@ function renderTpl() {
   if (tplKey === key) return; tplKey = key;
   $('tplBuilt').innerHTML = $('tplMine').innerHTML = '';
   TEMPLATE_LIST.forEach(t => addCard($('tplBuilt'), t, false));
-  if (!mine.length) $('tplMine').innerHTML = '<p class="hint">Aún no hay plantillas personalizadas. Guárdalas desde la pestaña Diseño.</p>';
+  if (!mine.length) $('tplMine').innerHTML = '<p class="hint">Aún no hay plantillas personalizadas. Guárdalas desde la pestaña Editor.</p>';
   mine.forEach(t => addCard($('tplMine'), t, true));
 }
 
@@ -990,7 +998,7 @@ function render(s) {
   $('main').classList.toggle('nosrc', none); $('noSrc').hidden = !none; $('edRename').disabled = none;
   $('edClose').disabled = !store.savedOpenIds().length;
   if (none) { ed.apply({}); $('liveBar').hidden = true; if (tab === 'prog') renderProgs(); if (tab === 'saved') renderSaved(); if (tab === 'tpl') renderTpl(); ovl.style.display = 'none'; hov.style.display = 'none'; return; }
-  $('monitors').classList.toggle('off', tab === 'design');   // en Diseño solo se ve el editor (los monitores siguen montados fuera de pantalla)
+  $('monitors').classList.toggle('off', tab === 'design');   // en Editor solo se ve el editor (los monitores siguen montados fuera de pantalla)
   const g = s.draft[sel]; if (!g) return;
   fixSel(g); buildLive(s);
   const show = {}; if (tab === 'design') open.forEach(id => { if (s.draft[id]) show[id] = { ...s.draft[id], visible: true }; });

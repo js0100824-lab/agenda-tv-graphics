@@ -23,6 +23,8 @@ export function setNames(map) {
 
 // Orden de los botones de los switches (se guarda en /slotOrder). Las claves de SLOTS siguen ese orden en todo el panel.
 let ORDER = [];
+// Orden completo: incluye también las fuentes cerradas, para que al reabrirlas vuelvan a su lugar en los switches.
+export const getOrder = () => { const o = [...ORDER]; Object.keys(SLOTS).forEach(k => { if (!o.includes(k)) o.push(k); }); return o; };
 export function applyOrder(order) {
   ORDER = Array.isArray(order) ? order : (order && typeof order === 'object' ? Object.values(order) : []);
   const ids = Object.keys(SLOTS), want = [...ORDER.filter(i => SLOTS[i]), ...ids.filter(i => !ORDER.includes(i))];

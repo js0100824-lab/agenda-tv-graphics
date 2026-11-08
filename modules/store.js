@@ -1,7 +1,7 @@
 // Estado central: /draft (lo que editas y ves en PREVIEW) y /program (lo que ve OBS).
 // Además: /headlines (titulares guardados) y /templates (plantillas personalizadas).
 import * as db from './firebase.js';
-import { SLOTS, DEFAULT_NAMES, newGraphic, arr, uid, setCustomSlots, applyOrder, setNames, setClosed, isBuiltin } from './templates.js';
+import { SLOTS, DEFAULT_NAMES, newGraphic, arr, uid, setCustomSlots, applyOrder, setNames, setClosed, isBuiltin, getOrder } from './templates.js';
 
 const state = { draft: {}, program: {}, headlines: {}, templates: {}, slots: {}, names: {}, programs: {}, closed: {}, openSrc: {} };
 const subs = new Set();
@@ -151,7 +151,10 @@ export function addSlot(name) {
 export function moveSlot(id, to) {   // cambia la posición de un gráfico en los switches y en «Editando»
   const ids = Object.keys(SLOTS), from = ids.indexOf(id); if (from < 0) return;
   to = Math.max(0, Math.min(ids.length - 1, to)); if (from === to) return;
-  ids.splice(from, 1); ids.splice(to, 0, id); applyOrder(ids); emit(); return db.set('slotOrder', ids);
+  ids.splice(from, 1); ids.splice(to, 0, id);
+  const full = getOrder(), open = new Set(ids); let n = 0;   // las fuentes cerradas conservan su sitio; las abiertas ocupan los suyos en el nuevo orden
+  const merged = full.map(k => (open.has(k) ? ids[n++] : k));
+  applyOrder(merged); emit(); return db.set('slotOrder', merged);
 }
 export function renameSlot(id, name) {   // cualquier gráfico se puede renombrar (los integrados guardan su nombre en /slotNames)
   name = String(name || '').trim(); if (!name || !SLOTS[id]) return;
@@ -162,6 +165,7 @@ export async function removeSlot(id) {
   if (!SLOTS[id] || !SLOTS[id].custom) return;
   delete state.slots[id]; delete hist[id]; setCustomSlots(state.slots); delete state.draft[id]; delete state.program[id]; emit();
   delete state.openSrc[id]; db.set(`openSources/${id}`, null);
+  { const o = getOrder().filter(k => k !== id); applyOrder(o); db.set('slotOrder', o); }
   await db.set(`program/${id}`, null); await db.set(`draft/${id}`, null); return db.set(`slots/${id}`, null);
 }
 
@@ -218,6 +222,7 @@ export function saveProgram(name, id, ids, { merge = false } = {}) {
 // Su contenido sigue guardado en el programa, así que se recupera con «Abrir».
 export async function closeSources(ids) {
   ids = ids.filter(k => SLOTS[k]); if (!ids.length) return;
+  applyOrder(getOrder());   // fija el lugar que ocupan ahora, también el de las que se cierran
   const custom = {}; ids.forEach(k => { custom[k] = !!SLOTS[k].custom; });
   ids.forEach(k => {
     clearTimeout(timers[k]); pending[k] = false; delete hist[k];
@@ -225,7 +230,7 @@ export async function closeSources(ids) {
     if (custom[k]) delete state.slots[k]; else state.closed[k] = true;
   });
   setCustomSlots(state.slots); setClosed(state.closed); emit();
-  const order = Object.keys(SLOTS), w = [];   // copia antes de escribir: los observadores de la base de datos reaccionan a cada escritura
+  const order = getOrder(), w = [];   // copia antes de escribir: los observadores de la base de datos reaccionan a cada escritura
   ids.forEach(k => {
     w.push(db.set(`program/${k}`, null), db.set(`draft/${k}`, null), db.set(`openSources/${k}`, null));
     w.push(custom[k] ? db.set(`slots/${k}`, null) : db.set(`closedSlots/${k}`, true));
@@ -252,7 +257,7 @@ export const openConflicts = pid => { const p = state.programs[pid]; return p ? 
 // Abre las fuentes de un programa SUMÁNDOLAS a las que ya hay; si una con el mismo id ya está abierta, la reemplaza.
 export async function openProgram(pid) {
   const p = state.programs[pid]; if (!p) return [];
-  const ids = progIds(p), before = Object.keys(SLOTS);
+  const ids = progIds(p);
   ids.forEach(k => {
     clearTimeout(timers[k]); pending[k] = false; delete hist[k];
     const pg = state.program[k]; if (pg && pg.visible) { pg.visible = false; db.set(`program/${k}/visible`, false); }   // si la fuente reemplazada estaba al aire, sale
@@ -260,13 +265,13 @@ export async function openProgram(pid) {
     else state.slots[k] = p.slots[k] ? clone(p.slots[k]) : { name: 'Fuente', ts: Date.now() };
   });
   setCustomSlots(state.slots); setClosed(state.closed); setNames(state.names);
-  applyOrder([...before.filter(k => SLOTS[k]), ...ids.filter(k => !before.includes(k))]);
+  const full = getOrder(); ids.forEach(k => { if (!full.includes(k)) full.push(k); }); applyOrder(full);   // cada fuente vuelve al lugar que tenía en los switches
   ids.forEach(k => {
     const g = { ...clone(p.graphics[k]), id: k, v: 2, visible: false }; g.elements = fixEls(g.elements);
     state.draft[k] = g; state.openSrc[k] = pid;
   });
   markNext = true; emit();
-  const order = Object.keys(SLOTS), w = [];   // copias antes de escribir: los observadores de la base de datos reaccionan a cada escritura
+  const order = getOrder(), w = [];   // copias antes de escribir: los observadores de la base de datos reaccionan a cada escritura
   const recs = ids.map(k => [k, isBuiltin(k), clone(state.slots[k] || null), state.names[k] || null, clone(state.draft[k])]);
   recs.forEach(([k, builtin, slot, name, draft]) => {
     w.push(builtin ? db.set(`closedSlots/${k}`, null) : db.set(`slots/${k}`, slot));
@@ -276,4 +281,13 @@ export async function openProgram(pid) {
   w.push(db.set('slotOrder', order));
   await Promise.all(w);
   return ids;
+}
+
+// Fuentes integradas que están cerradas (eliminadas o guardadas en un programa) y se pueden restaurar en blanco.
+export const closedBuiltins = () => Object.keys(state.closed).filter(k => state.closed[k] && isBuiltin(k));
+export async function restoreBuiltin(id) {
+  if (!isBuiltin(id) || !state.closed[id]) return;
+  delete state.closed[id]; delete state.names[id]; setClosed(state.closed); setNames(state.names);
+  state.draft[id] = newGraphic(id); const g = clone(state.draft[id]); emit();
+  await Promise.all([db.set(`closedSlots/${id}`, null), db.set(`slotNames/${id}`, null), db.set(`draft/${id}`, g)]);
 }

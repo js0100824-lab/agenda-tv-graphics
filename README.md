@@ -89,3 +89,8 @@ Sin `databaseURL` funciona en modo local (mismo navegador), solo para pruebas.
 - **Actualizar con lo abierto** (en cada programa): vuelve a guardar las fuentes de ese programa que tengas abiertas (las demás del programa se conservan sin tocar).
 - También las tres fuentes integradas (Gráfico principal, Cintilla inferior, Nombre / cargo) se pueden cerrar y volver a abrir; se puede quedar sin ninguna fuente abierta y el panel lo indica. Datos nuevos: `/closedSlots` y `/openSources`.
 - Los programas guardados con la versión 12 (que guardaban todo) se abren igual: traen todas sus fuentes.
+
+## Versión 13b
+- **Eliminar en todas las fuentes**: también las tres del inicio (Gráfico principal, Cintilla inferior, Nombre / cargo) tienen «Eliminar» en la lista de switches. Al eliminarlas salen de Operación y del aire; bajo la lista aparece «Restaurar … en blanco» para traerlas de nuevo.
+- **Cada fuente vuelve a su lugar**: al guardar un programa (o eliminar una fuente) y volver a abrirla, ocupa la misma posición que tenía en los switches; ya no se va al final. El orden completo se guarda en `/slotOrder`.
+- La pestaña **Diseño** ahora se llama **Editor**.
