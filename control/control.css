@@ -230,3 +230,22 @@ main.dsg .editbar{position:sticky;top:0;z-index:30;background:#111418;padding:6p
 .nlist .nitem{align-items:flex-start;padding:6px 8px;font-size:13px}.nlist .nitem b{padding-top:8px}
 .nlist textarea.nin{flex:1;min-width:0;font-size:13px}
 .nbtn{display:flex;flex-direction:column;gap:4px}.nbtn button{padding:5px 10px;border:0;border-radius:3px;background:#2a3340;color:#fff;cursor:pointer;font-weight:600;font-size:12px}.nbtn button:disabled{opacity:.4;cursor:not-allowed}
+
+/* Cerrar fuentes y ventana «Guardar programa» */
+.renb:disabled{opacity:.4;cursor:not-allowed}
+#noSrc{color:#f5c451}
+main.nosrc #opMain,main.nosrc #tab-design>*,main.nosrc #tab-ticker>*,main.nosrc #liveBar{display:none!important}
+.dlg{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:16px}
+.dlg[hidden]{display:none}
+.dbox{width:min(560px,100%);max-height:90vh;overflow:auto;background:#161b22;border:1px solid #2a3340;border-radius:6px;padding:18px 20px}
+.dbox h3{margin:0 0 4px}
+.sdlist{display:flex;flex-direction:column;gap:6px;margin:12px 0}
+.sdrow{display:flex;align-items:center;gap:10px;padding:9px 12px;background:#1a2028;border:1px solid #2a3340;border-radius:4px;cursor:pointer}
+.sdrow input{width:18px;height:18px;margin:0;flex:none}
+.sdrow.on{border-color:#1565ff;background:#0b1f4d}
+.sdrow .sdn{flex:1;font-weight:600}.sdrow .sdm{color:#9aa7b8;font-size:12px}
+.sdrow .badge{margin-left:0}
+.dbox .warn{color:#f5c451}
+.sdbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sdbtns .grow{flex:1}
+.sdbtns button{padding:8px 14px;border:0;border-radius:4px;background:#2a3340;color:#fff;cursor:pointer;font-weight:600}
+.sdbtns button:disabled{opacity:.45;cursor:not-allowed}

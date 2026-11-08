@@ -1,7 +1,7 @@
 import * as store from '../modules/store.js';
 import * as db from '../modules/firebase.js';
 import { createStage } from '../modules/stage.js';
-import { SLOTS, TEMPLATES, TEMPLATE_LIST, FONTS, arr, uid, layerOf, instantiate, newText, newImage, newLogo, newShape, newTicker, newClock } from '../modules/templates.js';
+import { SLOTS, isBuiltin, TEMPLATES, TEMPLATE_LIST, FONTS, arr, uid, layerOf, instantiate, newText, newImage, newLogo, newShape, newTicker, newClock } from '../modules/templates.js';
 import { CATALOG, normAnim, outKey } from '../modules/animations.js';
 
 const $ = id => document.getElementById(id);
@@ -12,14 +12,15 @@ const mk$ = (tag, cls, text) => { const e = document.createElement(tag); if (cls
 
 const prev = createStage($('mPrev'), { placeholders: true }), prog = createStage($('mProg'));
 const ed = createStage($('mEd'), { placeholders: true, static: true });   // editor propio de la pestaña Diseño (independiente de PREVIEW y PROGRAMA)
-let sel = 'headline', tab = 'op', editingH = null, loopOn = false, animElId = null;
-let open = new Set(['headline']);   // gráficos abiertos juntos en el editor de Diseño; «sel» es el activo (el que muestran la lista y las propiedades)
+let sel = Object.keys(SLOTS)[0] || null, tab = 'op', editingH = null, loopOn = false, animElId = null;
+let open = new Set(sel ? [sel] : []);   // gráficos abiertos juntos en el editor de Diseño; «sel» es el activo (el que muestran la lista y las propiedades)
 const STAGE = { x: 0, y: 0, w: 1920, h: 1080 };
 
 // ---------- Selección: un elemento, varios (Mayús + clic) o un grupo completo ----------
 const SEL = {};   // por gráfico: { id: elemento principal, multi: Set de ids, grp: id del grupo seleccionado }
 const S = () => SEL[sel] || (SEL[sel] = { id: null, multi: new Set(), grp: null });
 const draftOf = () => store.get().draft[sel];
+const firstSlot = () => Object.keys(SLOTS)[0] || null;   // primera fuente abierta (null si no queda ninguna)
 const elsOf = g => arr(g && g.elements);
 const grpOf = g => (g && g.groups) || {};
 const byId = (g, id) => elsOf(g).find(e => e.id === id);
@@ -100,7 +101,7 @@ function toggleView(id) {
 }
 function selectSlot(id, add) {
   loopOn = false; syncLoopBtns(); prev.stopTest(sel); sel = id;
-  if (add && tab === 'design') open.add(id); else open = new Set([id]);
+  if (add && tab === 'design' && id) open.add(id); else open = new Set(id ? [id] : []);
   ['fields', 'animQuick', 'animFull', 'animEl', 'insp'].forEach(i => { $(i).dataset.k = ''; }); render(store.get());
 }
 function buildEditbar() {
@@ -137,17 +138,17 @@ function buildAirpad(s) {
     });
   });
   const mg = $('swMgr'); mg.innerHTML = ''; mg.className = 'swmgr';
-  mg.append(mk$('p', 'hint', 'Para cambiar el orden, mantén pulsado un gráfico y arrástralo hacia arriba o hacia abajo (en el teléfono, desde las rayitas de la izquierda). Para cambiar su nombre, escribe en su cuadro y pulsa Enter. El orden se guarda y se aplica también en «Editando».'));
+  mg.append(mk$('p', 'hint', 'Para cambiar el orden, mantén pulsada una fuente y arrástrala hacia arriba o hacia abajo (en el teléfono, desde las rayitas de la izquierda). Para cambiar su nombre, escribe en su cuadro y pulsa Enter. El orden se guarda y se aplica también en «Fuentes».'));
   const list = mk$('div', 'mlist'); mg.append(list);
   ids.forEach(id => {
     const r = mk$('div', 'mrow'), inp = mk$('input', 'mname');
-    inp.value = SLOTS[id].name; inp.maxLength = 60; inp.title = 'Editar el nombre del gráfico';
+    inp.value = SLOTS[id].name; inp.maxLength = 60; inp.title = 'Editar el nombre de la fuente';
     inp.onchange = () => { const n = inp.value.trim(); if (n && n !== SLOTS[id].name) store.renameSlot(id, n); else inp.value = SLOTS[id].name; };
     inp.onkeydown = e => { if (e.key === 'Enter') inp.blur(); };
     r.append(mk$('div', 'grip'), inp);
     if (SLOTS[id].custom) {
       const x = mk$('button', 'danger', 'Eliminar');
-      x.onclick = () => { if (confirm(`¿Eliminar el gráfico «${SLOTS[id].name}»? Se borra también su diseño.`)) { if (sel === id) selectSlot('headline'); store.removeSlot(id); } };
+      x.onclick = () => { if (confirm(`¿Eliminar la fuente «${SLOTS[id].name}»? Se borra también su diseño.`)) { if (sel === id) selectSlot(Object.keys(SLOTS).find(k => k !== id) || null); store.removeSlot(id); } };
       r.append(x);
     }
     list.append(r);
@@ -175,17 +176,17 @@ function sortRows(list, ids, onMove) {
     r.addEventListener('pointermove', move); r.addEventListener('pointerup', up); r.addEventListener('pointercancel', up);
   }));
 }
-$('edRename').onclick = () => { const n = (prompt('Nuevo nombre del gráfico:', SLOTS[sel].name) || '').trim(); if (n) store.renameSlot(sel, n); };
+$('edRename').onclick = () => { if (!SLOTS[sel]) return; const n = (prompt('Nuevo nombre de la fuente:', SLOTS[sel].name) || '').trim(); if (n) store.renameSlot(sel, n); };
 $('slotAdd').onclick = () => {
-  const name = (prompt('Nombre del nuevo gráfico (por ejemplo: Marcador, Reloj, Logo):') || '').trim(); if (!name) return;
+  const name = (prompt('Nombre de la nueva fuente (por ejemplo: Marcador, Reloj, Logo):') || '').trim(); if (!name) return;
   selectSlot(store.addSlot(name));   // nuevo gráfico en blanco: aparece en los switches; se diseña en Diseño o Plantillas
 };
 let swOpen = false;
 $('swToggle').onclick = () => {
-  swOpen = !swOpen; $('opMain').hidden = swOpen; $('swPanel').hidden = !swOpen; $('swToggle').textContent = swOpen ? 'Cerrar switches' : 'Abrir switches';
+  swOpen = !swOpen; $('opMain').hidden = swOpen; $('swPanel').hidden = !swOpen; $('swToggle').textContent = swOpen ? 'Ocultar switches' : 'Mostrar switches';
 };
 function newBlankGraphic() {   // crea OTRO gráfico vacío; el gráfico seleccionado no se toca
-  const name = (prompt('Nombre del nuevo gráfico en blanco:', 'Gráfico ' + (Object.keys(SLOTS).length + 1)) || '').trim(); if (!name) return null;
+  const name = (prompt('Nombre de la nueva fuente en blanco:', 'Fuente ' + (Object.keys(SLOTS).length + 1)) || '').trim(); if (!name) return null;
   const id = store.addSlot(name); selectSlot(id); if (tab !== 'design') store.preview(id); return id;
 }
 $('tBlank').onclick = newBlankGraphic;
@@ -208,7 +209,7 @@ function syncContent(g) {
   if (box.dataset.k !== key) {
     box.dataset.k = key; box.innerHTML = '';
     texts.forEach(e => { const t = mk$('textarea'); t.rows = 2; t.dataset.id = e.id; t.oninput = () => edit(e.id, x => { x.text = t.value; }); box.append(mk$('label', '', e.name || 'Texto'), t); });
-    if (!texts.length) box.innerHTML = '<p class="hint">Este gráfico no tiene cuadros de texto. Puedes añadirlos en la pestaña Diseño.</p>';
+    if (!texts.length) box.innerHTML = '<p class="hint">Esta fuente no tiene cuadros de texto. Puedes añadirlos en la pestaña Diseño.</p>';
   }
   box.querySelectorAll('textarea').forEach(t => { const e = texts.find(x => x.id === t.dataset.id); if (e && document.activeElement !== t) t.value = e.text ?? ''; });
 }
@@ -225,7 +226,7 @@ function animFields(box, scope, el, full) {
   const inh = scope === 'e', ga = normAnim((draftOf() || {}).anim), ov = (el && el.anim) || {};
   const inKey = inh && ov.in && CATALOG[ov.in] ? ov.in : ga.in;
   const eff = { in: inKey, out: inh && ov.out ? ov.out : ga.out };
-  const dIn = (CATALOG[inKey] || {}).dirs, dOut = (CATALOG[outKey(eff)] || {}).dirs, H = inh ? [['', 'Heredar del gráfico']] : [];
+  const dIn = (CATALOG[inKey] || {}).dirs, dOut = (CATALOG[outKey(eff)] || {}).dirs, H = inh ? [['', 'Heredar de la fuente']] : [];
   const set = (p, v) => scope === 'g' ? store.mutate(sel, g => { g.anim = { ...g.anim, [p]: v }; }) : edit(el.id, e => { e.anim = { ...(e.anim || {}), [p]: v }; });
   const F = (p, label, kind, opt) => {
     const w = mk$('div', 'f'); w.append(mk$('label', '', label)); let i;
@@ -614,7 +615,7 @@ function renderMultiInsp(box, t) {
 function renderTickerTab(g) {
   const box = $('tkInsp'), tk = tickerOf(g);
   if (!tk) {
-    if (box.dataset.k !== 'none') { box.dataset.k = 'none'; box.innerHTML = '<p class="hint">Este gráfico no tiene cintilla.</p>'; const b = mk$('button', 'go', 'Añadir cintilla a este gráfico'); b.onclick = () => addEl(newTicker()); box.append(b); }
+    if (box.dataset.k !== 'none') { box.dataset.k = 'none'; box.innerHTML = '<p class="hint">Esta fuente no tiene cintilla.</p>'; const b = mk$('button', 'go', 'Añadir cintilla a esta fuente'); b.onclick = () => addEl(newTicker()); box.append(b); }
     return;
   }
   renderInsp(box, tk, 'ticker');
@@ -748,16 +749,18 @@ function snapshot(withDesign) {
   return rec;
 }
 function loadHeadline(h) {
-  const slot = h.slot && SLOTS[h.slot] ? h.slot : 'headline'; sel = slot; $('fields').dataset.k = '';
+  const slot = h.slot && SLOTS[h.slot] ? h.slot : (SLOTS[sel] ? sel : firstSlot()); if (!slot) { alert('No hay fuentes abiertas. Abre un programa o añade una fuente.'); return; } sel = slot; $('fields').dataset.k = '';
   if (h.design) store.setGraphic(slot, h.design);
   else store.mutate(slot, g => g.elements.forEach(e => { if (e.type === 'text' && e.role && h.texts && e.role in h.texts) e.text = h.texts[e.role]; }));
   render(store.get());
 }
 $('hSave').onclick = () => {
+  if (!draftOf()) { alert('No hay fuentes abiertas.'); return; }
   const name = $('hName').value.trim(); if (!name) { alert('Escribe un nombre para identificar el titular.'); return; }
   store.saveHeadline({ name, ...snapshot($('hDesign').checked) }); $('hName').value = '';
 };
 $('hUpd').onclick = () => {
+  if (!draftOf()) { alert('No hay fuentes abiertas.'); return; }
   const name = $('hName').value.trim(); if (!name) { alert('Escribe un nombre.'); return; }
   store.saveHeadline({ id: editingH, name, ...snapshot($('hDesign').checked) }); stopEdit();
 };
@@ -783,38 +786,97 @@ function renderSaved() {
   });
 }
 
-// ---------- Programas (conjuntos completos de gráficos) ----------
-let curProg = null; try { curProg = localStorage.getItem('atg_prog'); } catch { /* sin almacenamiento */ }
-const setCurProg = id => { curProg = id; try { id ? localStorage.setItem('atg_prog', id) : localStorage.removeItem('atg_prog'); } catch { /* nada */ } };
-const onAir = () => Object.values(store.get().program).some(g => g && g.visible);
-function afterOpen() {   // tras abrir un programa se reinicia todo lo que dependía de los gráficos anteriores
-  for (const k in SEL) delete SEL[k]; loopOn = false; syncLoopBtns(); prev.stopTest(sel); sel = 'headline'; open = new Set([sel]); animElId = null;
+// ---------- Programas (conjuntos de fuentes) ----------
+const onAir = ids => ids.some(id => { const g = store.get().program[id]; return g && g.visible; });
+const listNames = ids => ids.map(id => '«' + SLOTS[id].name + '»').join(', ');
+function afterOpen() {   // tras abrir o cerrar fuentes se reinicia todo lo que dependía de la selección anterior
+  for (const k in SEL) delete SEL[k]; loopOn = false; syncLoopBtns(); if (sel) prev.stopTest(sel);
+  if (!SLOTS[sel]) sel = firstSlot(); open = new Set(sel ? [sel] : []); animElId = null;
   ['fields', 'animQuick', 'animFull', 'animEl', 'insp', 'elList', 'editBtns', 'swProg'].forEach(i => { $(i).dataset.k = ''; }); render(store.get());
 }
-$('pSave').onclick = () => {
+
+// Ventana «¿Qué fuentes quieres guardar?»
+let dlgOk = null;
+function askSources(title, okText) {   // devuelve una promesa con los ids marcados (o null si se cancela)
+  const dlg = $('saveDlg'), list = $('sdList'), ids = store.sourceIds(), air = id => { const g = store.get().program[id]; return !!(g && g.visible); };
+  $('sdTitle').textContent = title; $('sdOk').textContent = okText; list.innerHTML = '';
+  const checks = ids.map(id => {
+    const row = mk$('label', 'sdrow'), cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = true; cb.dataset.id = id;
+    const d = store.get().draft[id], n = elsOf(d).length, from = store.sourceProgram(id), fp = from && store.get().programs[from];
+    row.append(cb, mk$('span', 'sdn', SLOTS[id].name), mk$('span', 'sdm', `${n} ${n === 1 ? 'elemento' : 'elementos'}${fp ? ' · en «' + fp.name + '»' : ''}`));
+    if (air(id)) row.append(mk$('span', 'badge', 'AL AIRE'));
+    list.append(row); return cb;
+  });
+  const sync = () => {
+    const on = checks.filter(c => c.checked).map(c => c.dataset.id);
+    checks.forEach(c => c.parentElement.classList.toggle('on', c.checked)); $('sdOk').disabled = !on.length;
+    const w = $('sdWarn'), a = on.filter(air); w.hidden = !a.length;
+    if (a.length) w.textContent = `Al aire ahora: ${listNames(a)}. Al guardar saldrán del aire.`;
+  };
+  checks.forEach(c => c.onchange = sync); sync();
+  $('sdAll').onclick = () => { checks.forEach(c => { c.checked = true; }); sync(); };
+  $('sdNone').onclick = () => { checks.forEach(c => { c.checked = false; }); sync(); };
+  dlg.hidden = false; $('sdOk').focus();
+  return new Promise(res => {
+    const done = v => { dlg.hidden = true; dlgOk = null; res(v); };
+    dlgOk = () => done(null);
+    $('sdCancel').onclick = () => done(null);
+    dlg.onpointerdown = e => { if (e.target === dlg) done(null); };
+    $('sdOk').onclick = () => done(checks.filter(c => c.checked).map(c => c.dataset.id));
+  });
+}
+addEventListener('keydown', e => { if (e.key === 'Escape' && dlgOk) { e.stopPropagation(); dlgOk(); } }, true);
+
+$('pSave').onclick = async () => {
   const name = $('pName').value.trim(); if (!name) { alert('Escribe un nombre para el programa.'); return; }
+  if (!store.sourceIds().length) { alert('No hay fuentes abiertas para guardar.'); return; }
   const same = store.programs().find(p => norm(p.name) === norm(name));
-  if (same && !confirm(`Ya existe un programa llamado «${same.name}». ¿Reemplazarlo con los gráficos actuales?`)) return;
-  setCurProg(store.saveProgram(name, same && same.id)); $('pName').value = '';
+  if (same && !confirm(`Ya existe un programa llamado «${same.name}». ¿Reemplazarlo con las fuentes que elijas?`)) return;
+  const ids = await askSources(`¿Qué fuentes quieres guardar en «${name}»?`, 'Guardar'); if (!ids || !ids.length) return;
+  await store.saveProgram(name, same && same.id, ids);
+  await store.closeSources(ids);   // las fuentes guardadas se cierran: salen de Operación y del aire
+  $('pName').value = ''; afterOpen();
 };
+
+// Cerrar: cierra todas las fuentes que están guardadas en un programa y deja solo las que no lo están
+$('edClose').onclick = async () => {
+  const ids = store.savedOpenIds(); if (!ids.length) { alert('No hay fuentes abiertas desde un programa. Las fuentes que no están guardadas en ningún programa no se cierran.'); return; }
+  const ch = store.changedIds(ids), rest = store.sourceIds().length - ids.length;
+  let msg = `¿Cerrar ${ids.length === 1 ? 'la fuente' : 'las ' + ids.length + ' fuentes'} guardadas en programas (${listNames(ids)})?\n\n` +
+    (rest ? `Se quedan abiertas las ${rest} que no están guardadas en ningún programa.` : 'No quedará ninguna fuente abierta.');
+  if (onAir(ids)) msg += '\n\nLo que esté al aire de ellas saldrá del aire.';
+  if (ch.length) msg += `\n\nATENCIÓN: tienen cambios sin guardar ${listNames(ch)}. Si cierras, esos cambios se pierden. (Para conservarlos cancela y usa «Actualizar con lo abierto» en Programas.)`;
+  if (!confirm(msg)) return;
+  await store.closeSources(ids); afterOpen();
+};
+
 $('pSearch').oninput = () => { $('pList').dataset.k = ''; renderProgs(); };
 function renderProgs() {
   const q = norm($('pSearch').value), all = store.programs(), list = all.filter(p => !q || norm(p.name).includes(q));
-  const key = q + '|' + curProg + '|' + list.map(p => p.id + p.ts + p.name).join();
+  const key = q + '|' + store.sourceIds().map(id => id + ':' + (store.sourceProgram(id) || '')).join() + '|' + list.map(p => p.id + p.ts + p.name).join();
   const box = $('pList'); if (box.dataset.k === key) return; box.dataset.k = key; box.innerHTML = '';
   if (!list.length) { box.innerHTML = `<p class="hint">${all.length ? 'Sin resultados.' : 'Todavía no hay programas guardados.'}</p>`; return; }
   list.forEach(p => {
-    const names = store.progNames(p), r = mk$('div', 'hrow' + (p.id === curProg ? ' edit' : ''));
-    r.innerHTML = `<div class="ht"><b>${esc(p.name)}</b>${p.id === curProg ? '<span class="badge">ABIERTO</span>' : ''}<div class="hh">${names.length} ${names.length === 1 ? 'gráfico' : 'gráficos'}</div><div class="hs">${esc(names.join(' · '))}</div></div><div class="hb"></div>`;
+    const names = store.progNames(p), opened = store.progOpenIds(p.id), r = mk$('div', 'hrow' + (opened.length ? ' edit' : ''));
+    r.innerHTML = `<div class="ht"><b>${esc(p.name)}</b>${opened.length ? `<span class="badge">ABIERTO${opened.length < names.length ? ' ' + opened.length + ' DE ' + names.length : ''}</span>` : ''}<div class="hh">${names.length} ${names.length === 1 ? 'fuente' : 'fuentes'}</div><div class="hs">${esc(names.join(' · '))}</div></div><div class="hb"></div>`;
     const hb = r.querySelector('.hb'), b = (txt, f, c) => { const x = mk$('button', c || '', txt); x.onclick = f; hb.append(x); };
     b('Abrir', async () => {
-      if (!confirm(`¿Abrir «${p.name}»? Se reemplazan todos los gráficos actuales por los de este programa.${onAir() ? ' Lo que esté al aire saldrá del aire.' : ''}`)) return;
-      await store.openProgram(p.id); setCurProg(p.id); afterOpen();
+      const rep = store.openConflicts(p.id), ch = store.changedIds(rep);
+      let msg = `¿Abrir «${p.name}»? Se abren ${names.length === 1 ? 'su fuente' : 'sus ' + names.length + ' fuentes'} junto a las que ya tienes abiertas.`;
+      if (rep.length) msg += `\n\nYa están abiertas y se reemplazan por lo guardado: ${listNames(rep)}.${onAir(rep) ? ' Lo que esté al aire de ellas saldrá del aire.' : ''}`;
+      if (ch.length) msg += `\n\nATENCIÓN: ${listNames(ch)} tiene cambios sin guardar que se perderán.`;
+      if (!confirm(msg)) return;
+      await store.openProgram(p.id); afterOpen();
     }, 'go');
-    b('Actualizar con lo actual', () => { if (confirm(`¿Reemplazar el contenido guardado de «${p.name}» con los gráficos actuales?`)) setCurProg(store.saveProgram(p.name, p.id)); });
+    b('Actualizar con lo abierto', async () => {
+      const ids = store.progOpenIds(p.id);
+      if (!ids.length) { alert(`Ninguna fuente de «${p.name}» está abierta. Ábrelo primero, edita las fuentes y luego actualiza.`); return; }
+      if (!confirm(`¿Actualizar «${p.name}» con lo que tienes ahora en ${listNames(ids)}? Las fuentes de este programa que no estén abiertas se conservan como están.`)) return;
+      await store.saveProgram(p.name, p.id, ids, { merge: true }); renderProgs();
+    });
     b('Renombrar', () => { const n = (prompt('Nuevo nombre del programa:', p.name) || '').trim(); if (n) store.renameProgram(p.id, n); });
     b('Duplicar', () => store.duplicateProgram(p.id));
-    b('Eliminar', () => { if (confirm(`¿Eliminar el programa «${p.name}»?`)) { if (curProg === p.id) setCurProg(null); store.deleteProgram(p.id); } }, 'danger');
+    b('Eliminar', () => { if (confirm(`¿Eliminar el programa «${p.name}»?${opened.length ? ' Sus fuentes abiertas se quedan, pero dejan de estar guardadas.' : ''}`)) store.deleteProgram(p.id); }, 'danger');
     box.append(r);
   });
 }
@@ -822,6 +884,7 @@ function renderProgs() {
 // ---------- Plantillas ----------
 let tplKey = null;
 function useTemplate(t) {
+  if (t.key !== 'blank' && !SLOTS[sel]) { alert('No hay fuentes abiertas. Abre un programa o añade una fuente.'); return; }
   if (t.key === 'blank') { if (newBlankGraphic() && tab !== 'design') setTab('design'); return; }
   store.setGraphic(sel, instantiate(t, draftOf())); const s = S(); s.id = null; s.grp = null; s.multi = new Set(); $('fields').dataset.k = ''; render(store.get());
 }
@@ -833,7 +896,7 @@ function addCard(grid, t, del) {
   createStage(th, { static: true, placeholders: true }).apply({ x: { visible: true, elements: t.elements, anim: t.anim } });
 }
 function renderTpl() {
-  $('tplHint').textContent = `Al elegir una plantilla se carga en «${SLOTS[sel].name}» conservando los textos, el logotipo y las noticias actuales.`;
+  $('tplHint').textContent = SLOTS[sel] ? `Al elegir una plantilla se carga en «${SLOTS[sel].name}» conservando los textos, el logotipo y las noticias actuales.` : 'No hay fuentes abiertas: abre un programa o añade una fuente para usar una plantilla.';
   const mine = store.templates(), key = mine.map(t => t.id + t.ts).join();
   if (tplKey === key) return; tplKey = key;
   $('tplBuilt').innerHTML = $('tplMine').innerHTML = '';
@@ -920,9 +983,13 @@ new ResizeObserver(syncOffsets).observe(asideEl); new ResizeObserver(syncOffsets
 
 // ---------- Render general ----------
 function render(s) {
-  if (!SLOTS[sel]) sel = 'headline';
-  open = new Set([...open].filter(id => SLOTS[id])); open.add(sel);
+  if (!SLOTS[sel]) sel = firstSlot();
+  open = new Set([...open].filter(id => SLOTS[id])); if (sel) open.add(sel);
   prev.apply(s.draft); prog.apply(s.program); buildEditbar(); buildAirpad(s);
+  const none = !sel;   // sin fuentes abiertas (todas guardadas en programas y cerradas)
+  $('main').classList.toggle('nosrc', none); $('noSrc').hidden = !none; $('edRename').disabled = none;
+  $('edClose').disabled = !store.savedOpenIds().length;
+  if (none) { ed.apply({}); $('liveBar').hidden = true; if (tab === 'prog') renderProgs(); if (tab === 'saved') renderSaved(); if (tab === 'tpl') renderTpl(); ovl.style.display = 'none'; hov.style.display = 'none'; return; }
   $('monitors').classList.toggle('off', tab === 'design');   // en Diseño solo se ve el editor (los monitores siguen montados fuera de pantalla)
   const g = s.draft[sel]; if (!g) return;
   fixSel(g); buildLive(s);

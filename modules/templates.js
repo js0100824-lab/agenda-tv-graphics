@@ -11,6 +11,10 @@ export const SLOTS = {
   nameplate: { name: 'Nombre / cargo',    tpl: 'nameplate', layer: 3 }
 };
 
+// Copia de las fuentes integradas: se pueden cerrar (al guardarlas en un programa) y volver a abrir.
+const BUILTIN = Object.fromEntries(Object.entries(SLOTS).map(([k, v]) => [k, { ...v }]));
+export const isBuiltin = id => id in BUILTIN;
+
 // Nombres por defecto de los gráficos integrados; el usuario puede renombrarlos (se guarda en /slotNames).
 export const DEFAULT_NAMES = Object.fromEntries(Object.entries(SLOTS).map(([k, v]) => [k, v.name]));
 export function setNames(map) {
@@ -23,6 +27,16 @@ export function applyOrder(order) {
   ORDER = Array.isArray(order) ? order : (order && typeof order === 'object' ? Object.values(order) : []);
   const ids = Object.keys(SLOTS), want = [...ORDER.filter(i => SLOTS[i]), ...ids.filter(i => !ORDER.includes(i))];
   const rec = want.map(i => [i, SLOTS[i]]); ids.forEach(k => delete SLOTS[k]); rec.forEach(([k, v]) => { SLOTS[k] = v; });
+}
+
+// Fuentes integradas cerradas (se guardan en /closedSlots): salen de SLOTS hasta que un programa las vuelve a abrir.
+export function setClosed(map) {
+  const closed = map || {};
+  for (const k of Object.keys(BUILTIN)) {
+    if (closed[k]) delete SLOTS[k];
+    else if (!SLOTS[k]) SLOTS[k] = { ...BUILTIN[k] };
+  }
+  applyOrder(ORDER);
 }
 
 // Gráficos adicionales creados por el usuario (se guardan en /slots y se suman a los tres integrados)

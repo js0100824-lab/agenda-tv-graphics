@@ -11,11 +11,11 @@
     <div id="pvBox"><div class="pvh"><h2>PREVIEW</h2></div><div class="mon" id="mPrev"></div></div>
     <div><div class="pvh"><h2 class="onair">PROGRAMA · OBS</h2></div><div class="mon air" id="mProg"></div></div>
   </section>
-  <section class="editbar" id="editbar"><span class="dlab">Editando</span><div class="seg" id="editBtns"></div><button id="edRename" class="renb" title="Cambiar el nombre del gráfico que estás editando">Renombrar</button><span class="hint" id="edHint" hidden>Toca otro gráfico para abrirlo junto al actual; toca el activo para cerrarlo.</span></section>
+  <section class="editbar" id="editbar"><span class="dlab">Fuentes</span><div class="seg" id="editBtns"></div><button id="edRename" class="renb" title="Cambiar el nombre de la fuente seleccionada">Renombrar</button><button id="edClose" class="renb" title="Cierra las fuentes que están guardadas en un programa. Las que no están guardadas en ningún programa se quedan.">Cerrar</button><span class="hint" id="edHint" hidden>Toca otra fuente para abrirla junto a la actual en el editor; toca la activa para quitarla del editor.</span><span class="hint" id="noSrc" hidden>No hay fuentes abiertas. Abre un programa en la pestaña Programas o pulsa «Añadir fuente» en Operación.</span></section>
   <section class="livebar" id="liveBar" hidden></section>
 
   <section class="panel tab" id="tab-op">
-    <div class="optool"><button id="swToggle" class="go">Abrir switches</button><button id="slotAdd">Añadir gráfico</button></div>
+    <div class="optool"><button id="swToggle" class="go">Mostrar switches</button><button id="slotAdd">Añadir fuente</button></div>
     <div id="opMain">
       <div class="cols"><div id="fields"></div>
         <div><h3>Animación</h3><div id="animQuick"></div>
@@ -23,16 +23,16 @@
         <p class="hint">Las pruebas solo se ven en PREVIEW; no afectan a lo que está en aire. Más opciones en «Animación avanzada», más abajo.</p></div></div>
       <div class="btns"><button id="bPrev">Previsualizar</button>
         <button id="bUpd" class="go">Actualizar en aire</button><button id="bClr">Limpiar</button></div>
-      <p class="hint">Para sacar un gráfico al aire o quitarlo usa el botón «Abrir switches».</p>
+      <p class="hint">Para sacar una fuente al aire o quitarla usa el botón «Mostrar switches».</p>
       <details class="adv" id="animMore"><summary>Animación avanzada (retardos, velocidad, por elemento)</summary>
-        <h3>Animación del gráfico</h3><div id="animFull"></div>
+        <h3>Animación de la fuente</h3><div id="animFull"></div>
         <h3>Animación por elemento</h3><div id="animEl"></div></details>
     </div>
     <div id="swPanel" hidden>
       <div class="swblock"><div class="swlab prog">PROGRAMA</div><div class="swrow" id="swProg"></div></div>
       <div class="swblock"><div class="swlab prev">PREVIEW</div><div class="swrow" id="swPrev"></div></div>
       <div id="swMgr"></div>
-      <p class="hint">PROGRAMA: un clic saca el gráfico al aire (rojo) y otro clic lo oculta. PREVIEW: enciende o apaga el gráfico en la vista previa (verde) y lo deja seleccionado para editarlo. Pulsa «Cerrar switches» para volver.</p>
+      <p class="hint">PROGRAMA: un clic saca la fuente al aire (rojo) y otro clic la oculta. PREVIEW: enciende o apaga la fuente en la vista previa (verde) y la deja seleccionada para editarla. Pulsa «Ocultar switches» para volver.</p>
     </div>
   </section>
 
@@ -43,7 +43,7 @@
         <div class="dgrp"><span class="dlab">Añadir</span><button id="addText">Texto</button><button id="addClock">Reloj</button><button id="addLogo">Logotipo</button><button id="addImg">Imagen</button><button id="addShape">Forma</button><button id="addTicker">Cintilla</button></div>
         <div class="dgrp"><span class="dlab">Historial</span><button id="edUndo" title="Ctrl + Z">Deshacer</button><button id="edRedo" title="Ctrl + Y">Rehacer</button></div>
         <div class="dgrp"><span class="dlab">Imán</span><label class="chk"><input type="checkbox" id="snapOn" checked> Pegar a otros elementos</label></div>
-        <div class="dgrp"><span class="dlab">Gráfico</span><button id="tBlank">Empezar en blanco</button></div>
+        <div class="dgrp"><span class="dlab">Fuente</span><button id="tBlank">Empezar en blanco</button></div>
       </div>
     </div>
     <div class="dright">
@@ -54,15 +54,15 @@
         <div class="bgrid2"><button id="gAll">Seleccionar todo</button><button id="gGroup" class="go">Agrupar</button><button id="gUngroup">Desagrupar</button><button id="gDup">Duplicar grupo</button><button id="gLock">Bloquear</button></div></div>
       <div class="dcard"><h3>Alinear</h3><select id="alignRef" hidden><option value="sel">Respecto a la selección</option><option value="stage">Respecto al escenario</option></select><div class="bgrid3" id="alignBar"></div></div>
       <details class="dcard"><summary>Guardar como plantilla</summary><div class="row"><input id="tName" placeholder="Nombre de la plantilla"><button id="tSave" class="go">Guardar</button></div></details>
-      <details class="dcard"><summary>Ayuda</summary><p class="hint">Clic en el editor selecciona. Mayús + clic suma elementos. Doble clic entra en un grupo. Arrastra para mover y usa el cuadro de la esquina para cambiar el tamaño (en grupos siempre mantiene proporciones). Flechas del teclado: mover 1 px, con Mayús 10 px. Clic derecho (o mantener pulsado en el teléfono) sobre el editor: copiar, pegar, eliminar y «Añadir», que abre al lado la lista de lo que puedes añadir (texto, logotipo, imagen, forma, cintilla) en el punto donde hiciste clic. Imán: al mover o cambiar el tamaño, el elemento se pega a los bordes y centros de los demás elementos y del escenario, y aparece una línea magenta; mantén Alt para moverlo libremente o desmarca «Pegar a otros elementos». Atajos: Ctrl + C, Ctrl + V, Ctrl + Z (deshacer) y Ctrl + Y (rehacer). El editor muestra siempre el gráfico que estás editando, aunque su switch esté apagado. En «Editando» puedes abrir varios gráficos a la vez: se ven juntos y puedes seleccionar y mover elementos de cualquiera de ellos.</p></details>
+      <details class="dcard"><summary>Ayuda</summary><p class="hint">Clic en el editor selecciona. Mayús + clic suma elementos. Doble clic entra en un grupo. Arrastra para mover y usa el cuadro de la esquina para cambiar el tamaño (en grupos siempre mantiene proporciones). Flechas del teclado: mover 1 px, con Mayús 10 px. Clic derecho (o mantener pulsado en el teléfono) sobre el editor: copiar, pegar, eliminar y «Añadir», que abre al lado la lista de lo que puedes añadir (texto, logotipo, imagen, forma, cintilla) en el punto donde hiciste clic. Imán: al mover o cambiar el tamaño, el elemento se pega a los bordes y centros de los demás elementos y del escenario, y aparece una línea magenta; mantén Alt para moverlo libremente o desmarca «Pegar a otros elementos». Atajos: Ctrl + C, Ctrl + V, Ctrl + Z (deshacer) y Ctrl + Y (rehacer). El editor muestra siempre la fuente seleccionada, aunque su switch esté apagado. En «Fuentes» puedes abrir varias a la vez: se ven juntas y puedes seleccionar y mover elementos de cualquiera de ellas.</p></details>
     </div>
   </section>
 
 
   <section class="panel tab" id="tab-prog" hidden>
-    <h3>Guardar los gráficos actuales como programa</h3>
+    <h3>Guardar fuentes como programa</h3>
     <div class="saveRow"><input id="pName" placeholder="Nombre del programa (por ejemplo: Noticiero de la noche)"><button id="pSave" class="go">Guardar programa</button></div>
-    <p class="hint">Se guardan todos los gráficos de una vez: diseños, textos, logotipos, cintillas, relojes, nombres y orden de los switches. Lo que esté al aire no se guarda ni se toca hasta que abras otro programa.</p>
+    <p class="hint">Al pulsar «Guardar programa» eliges qué fuentes guardar. Al guardarlas se cierran: salen de Operación y del aire. Para volver a tenerlas pulsa «Abrir» en el programa, y para cerrarlas otra vez usa el botón «Cerrar» junto a «Renombrar», arriba. Las fuentes que no guardes se quedan como están.</p>
     <h3>PROGRAMAS GUARDADOS</h3>
     <input id="pSearch" placeholder="Buscar programas…"><div id="pList" class="hlist"></div>
   </section>
@@ -84,5 +84,12 @@
     <h3>Mis plantillas</h3><div id="tplMine" class="grid"></div>
   </section>
 </main>
+<div id="saveDlg" class="dlg" hidden><div class="dbox" role="dialog" aria-modal="true" aria-labelledby="sdTitle">
+  <h3 id="sdTitle">¿Qué fuentes quieres guardar?</h3>
+  <p class="hint">Marca las fuentes que se guardan en el programa. Al pulsar «Guardar», esas fuentes se cierran y salen de Operación; las que no marques se quedan abiertas.</p>
+  <div id="sdList" class="sdlist"></div>
+  <p id="sdWarn" class="hint warn" hidden></p>
+  <div class="sdbtns"><button id="sdAll">Marcar todas</button><button id="sdNone">Ninguna</button><span class="grow"></span><button id="sdCancel">Cancelar</button><button id="sdOk" class="go">Guardar</button></div>
+</div></div>
 <datalist id="sepList"><option value="●"><option value="◆"><option value="■"><option value="★"><option value="•"><option value="|"><option value="—"><option value="//"></datalist>
 <script type="module" src="control.js"></script></body></html>
