@@ -46,18 +46,48 @@ export async function init() {
   db.watch('templates', v => { state.templates = fixLib(v); emit(); });
 }
 
+// ---------- Historial (deshacer / rehacer) por gráfico ----------
+const hist = {}; let markNext = true, autoPreview = true;
+const H = id => hist[id] || (hist[id] = { past: [], future: [], last: 0 });
+export const markStep = () => { markNext = true; };          // el siguiente cambio abre un paso nuevo del historial
+export const setAutoPreview = v => { autoPreview = !!v; };   // en Diseño, editar no enciende el switch de PREVIEW
+export const canUndo = id => !!(hist[id] && hist[id].past.length);
+export const canRedo = id => !!(hist[id] && hist[id].future.length);
+function pushNow(id) { const h = H(id); h.past.push(clone(state.draft[id])); if (h.past.length > 100) h.past.shift(); h.future = []; h.last = 0; markNext = true; }
+function restore(id, snapshot) {
+  const keep = state.draft[id].visible; snapshot.id = id; snapshot.visible = keep;
+  state.draft[id] = snapshot; H(id).last = 0; markNext = true; emit(); saveDraft(id);
+}
+export function undo(id) {
+  const h = H(id); if (!h.past.length || !state.draft[id]) return false;
+  h.future.push(clone(state.draft[id])); restore(id, h.past.pop()); return true;
+}
+export function redo(id) {
+  const h = H(id); if (!h.future.length || !state.draft[id]) return false;
+  h.past.push(clone(state.draft[id])); restore(id, h.future.pop()); return true;
+}
+
 const timers = {}, pending = {};
 function saveDraft(id) {   // guardado con pequeño retardo mientras se escribe o se arrastra
   pending[id] = true; clearTimeout(timers[id]);
   timers[id] = setTimeout(() => { pending[id] = false; db.set(`draft/${id}`, state.draft[id]); }, 250);
 }
 // Modifica el borrador. Por defecto lo deja visible en PREVIEW para ver el cambio al instante.
-export function mutate(id, fn, { preview = true } = {}) {
+export function mutate(id, fn, { preview = autoPreview, history = true } = {}) {
   const g = state.draft[id]; if (!g) return;
-  fn(g); if (preview) g.visible = true;
+  let before = null, h = null, was = null;
+  if (history) {   // un gesto continuo (arrastrar, escribir) cuenta como un solo paso
+    h = H(id); const now = Date.now();
+    if (markNext || now - h.last > 800) { before = JSON.stringify(g); was = { m: markNext, f: h.future }; h.past.push(JSON.parse(before)); if (h.past.length > 100) h.past.shift(); h.future = []; markNext = false; }
+    h.last = now;
+  }
+  fn(g);
+  if (before !== null && JSON.stringify(g) === before) { h.past.pop(); h.future = was.f; markNext = was.m; }   // no cambió nada: no ensucia el historial
+  if (preview) g.visible = true;
   emit(); saveDraft(id);
 }
 export function setGraphic(id, g) {   // reemplaza el gráfico completo del borrador (plantilla / diseño guardado)
+  if (state.draft[id]) pushNow(id);
   state.draft[id] = { ...clone(g), id, v: 2, visible: true };
   state.draft[id].elements = fixEls(state.draft[id].elements);
   emit(); return db.set(`draft/${id}`, state.draft[id]);
@@ -65,6 +95,7 @@ export function setGraphic(id, g) {   // reemplaza el gráfico completo del borr
 export function preview(id) { state.draft[id].visible = true; emit(); return db.set(`draft/${id}`, state.draft[id]); }
 export function unpreview(id) { state.draft[id].visible = false; emit(); return db.set(`draft/${id}`, state.draft[id]); }
 export function clearDraft(id) {
+  pushNow(id);
   state.draft[id].elements.forEach(e => { if (e.type === 'text') e.text = ''; });
   emit(); return db.set(`draft/${id}`, state.draft[id]);
 }
@@ -84,7 +115,7 @@ export async function hide(id) {
 // Cambios EN VIVO de un solo elemento (pausar/reanudar cinta, activar/ocultar): se escriben en el borrador y
 // directamente en /program solo en ese campo, sin tocar el resto del contenido en aire.
 export function live(id, elId, patch) {
-  mutate(id, g => { const e = g.elements.find(x => x.id === elId); if (e) Object.assign(e, patch); }, { preview: false });
+  mutate(id, g => { const e = g.elements.find(x => x.id === elId); if (e) Object.assign(e, patch); }, { preview: false, history: false });
   const pg = state.program[id]; if (!pg) return;
   const i = arr(pg.elements).findIndex(x => x.id === elId); if (i < 0) return;
   for (const k in patch) { pg.elements[i][k] = patch[k]; db.set(`program/${id}/elements/${i}/${k}`, patch[k]); }
@@ -102,7 +133,7 @@ export function renameSlot(id, name) {
 }
 export async function removeSlot(id) {
   if (!SLOTS[id] || !SLOTS[id].custom) return;
-  delete state.slots[id]; setCustomSlots(state.slots); delete state.draft[id]; delete state.program[id]; emit();
+  delete state.slots[id]; delete hist[id]; setCustomSlots(state.slots); delete state.draft[id]; delete state.program[id]; emit();
   await db.set(`program/${id}`, null); await db.set(`draft/${id}`, null); return db.set(`slots/${id}`, null);
 }
 

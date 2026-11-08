@@ -33,3 +33,10 @@ Sin `databaseURL` funciona en modo local (mismo navegador), solo para pruebas.
 - **Switches** dentro de Operación, bajo los monitores: botón «Abrir switches» / «Cerrar switches» y «Añadir gráfico».
 - **Empezar en blanco** crea un gráfico nuevo y vacío sin tocar el que estaba seleccionado.
 - **Cintilla**: separación automática de noticias (Enter, |, • y fin de frase) con lista de las noticias detectadas.
+
+## Versión 5
+- **Diseño tiene su propio editor**: ya no se edita sobre PREVIEW. En la pestaña Diseño se ocultan los monitores PREVIEW y PROGRAMA y se muestra solo el editor, que enseña siempre el gráfico que estás editando aunque su switch esté apagado.
+- **Corregido el bug del switch**: entrar a Diseño o editar allí ya no enciende el switch de PREVIEW ni abre el gráfico apagado.
+- **Copiar y pegar**: botones Copiar / Pegar, clic derecho sobre el editor (Copiar, Pegar, Eliminar) y atajos Ctrl+C / Ctrl+V. Funciona con un elemento, varios o un grupo, y se puede pegar en otra fuente (cambia de fuente en «Editando» y pega).
+- **Deshacer / Rehacer**: botones y atajos Ctrl+Z / Ctrl+Y (también Ctrl+Mayús+Z). Un arrastre o un rato escribiendo cuenta como un solo paso. Historial independiente por gráfico (hasta 100 pasos).
+- **Textura**: formas y cuadros de texto admiten una imagen de relleno (Cargar textura / Quitar textura) con ajuste: rellenar, ajustar, estirar o mosaico.

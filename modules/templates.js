@@ -180,12 +180,21 @@ function mountTicker(n, tr, vp, e) {   // cinta continua sin huecos: dos grupos 
   if (n._paused) n._anim.pause();
 }
 
+// Textura: una imagen que rellena la forma o el cuadro de texto (la imagen sigue el redondeo del elemento)
+function applyTex(s, e) {
+  if (!e.tex) return;
+  s.backgroundImage = `url("${e.tex}")`; s.backgroundPosition = 'center';
+  const f = e.texFit || 'cover';
+  s.backgroundRepeat = f === 'tile' ? 'repeat' : 'no-repeat';
+  s.backgroundSize = f === 'tile' ? Math.max(8, num(e.texScale, 200)) + 'px auto' : f === 'stretch' ? '100% 100%' : f;
+}
+
 export function buildElement(e, opts = {}) {
   const n = div(`el ${e.type}`); n.dataset.id = e.id;
   const s = n.style;
   s.left = num(e.x) + 'px'; s.top = num(e.y) + 'px'; s.width = Math.max(1, num(e.w, 100)) + 'px'; s.height = Math.max(1, num(e.h, 50)) + 'px';
   if (e.type === 'text') {
-    s.background = e.bg || 'transparent'; s.color = e.color || '#fff';
+    s.background = e.bg || 'transparent'; s.color = e.color || '#fff'; applyTex(s, e);
     s.alignItems = { top: 'flex-start', middle: 'center', bottom: 'flex-end' }[e.valign] || 'center';
     const t = div('t', e.text || '');
     Object.assign(t.style, { padding: `4px ${num(e.padX, 24)}px`, textAlign: e.align || 'left', fontFamily: ff(e.font),
@@ -196,7 +205,7 @@ export function buildElement(e, opts = {}) {
     if (e.src) { const im = new Image(); im.src = e.src; im.draggable = false; im.style.objectFit = e.fit || 'contain'; n.append(im); }
     else if (opts.placeholders) { n.classList.add('ph'); n.textContent = 'LOGO / IMAGEN'; }
   } else if (e.type === 'shape') {
-    s.background = e.color || '#1565ff'; s.opacity = num(e.opacity, 1); s.borderRadius = num(e.radius) + 'px';
+    s.background = e.color || '#1565ff'; s.opacity = num(e.opacity, 1); s.borderRadius = num(e.radius) + 'px'; applyTex(s, e);
   } else if (e.type === 'ticker') {
     s.background = e.bg || 'transparent'; s.color = e.color || '#fff'; s.fontFamily = ff(e.font);
     s.fontSize = num(e.size, 36) + 'px'; s.fontWeight = e.weight || 600;

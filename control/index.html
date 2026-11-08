@@ -7,8 +7,8 @@
   <nav id="nav"><a data-tab="op" class="on">Operación</a><a data-tab="design">Diseño</a><a data-tab="anim">Animaciones</a><a data-tab="ticker">Cintilla</a><a data-tab="saved">Titulares guardados</a><a data-tab="tpl">Plantillas</a></nav>
   <div class="foot"><div id="status" class="status">…</div><label>URL para OBS</label><input id="obsurl" readonly></div></aside>
 <main>
-  <section class="monitors">
-    <div id="pvBox"><div class="pvh"><h2>PREVIEW</h2><button id="bigOpen" class="pvbtn" hidden>Ampliar</button></div><div class="bigbar" id="bigBar" hidden></div><div class="mon" id="mPrev"></div></div>
+  <section class="monitors" id="monitors">
+    <div id="pvBox"><div class="pvh"><h2>PREVIEW</h2></div><div class="mon" id="mPrev"></div></div>
     <div><div class="pvh"><h2 class="onair">PROGRAMA · OBS</h2></div><div class="mon air" id="mProg"></div></div>
   </section>
   <section class="editbar" id="editbar"><span class="dlab">Editando</span><div class="seg" id="editBtns"></div></section>
@@ -35,9 +35,12 @@
 
   <section class="panel tab" id="tab-design" hidden>
     <div class="dtool">
-      <div class="dgrp"><span class="dlab">Vista</span><button id="bigPv" class="go">Vista previa grande</button><button id="tBlank">Empezar en blanco</button></div>
+      <div class="dgrp"><span class="dlab">Gráfico</span><button id="tBlank">Empezar en blanco</button></div>
       <div class="dgrp"><span class="dlab">Añadir</span><button id="addText">Texto</button><button id="addLogo">Logotipo</button><button id="addImg">Imagen</button><button id="addShape">Forma</button><button id="addTicker">Cintilla</button></div>
+      <div class="dgrp"><span class="dlab">Historial</span><button id="edUndo" title="Ctrl + Z">Deshacer</button><button id="edRedo" title="Ctrl + Y">Rehacer</button></div>
+      <div class="dgrp"><span class="dlab">Copiar y pegar</span><button id="edCopy" title="Ctrl + C">Copiar</button><button id="edPaste" title="Ctrl + V">Pegar</button><span class="hint" id="clipInfo"></span></div>
     </div>
+    <div class="edwrap"><div class="bigbar" id="bigBar"></div><div class="mon ed" id="mEd"></div></div>
     <div class="dcols">
       <div class="dside">
         <div class="dcard"><h3>Elementos</h3><div id="elList" class="elist"></div></div>
@@ -46,7 +49,7 @@
           <div class="bgrid2"><button id="gAll">Seleccionar todo</button><button id="gGroup" class="go">Agrupar</button><button id="gUngroup">Desagrupar</button><button id="gDup">Duplicar grupo</button><button id="gLock">Bloquear</button></div></div>
         <div class="dcard"><h3>Alinear</h3><select id="alignRef" hidden><option value="sel">Respecto a la selección</option><option value="stage">Respecto al escenario</option></select><div class="bgrid3" id="alignBar"></div></div>
         <details class="dcard"><summary>Guardar como plantilla</summary><div class="row"><input id="tName" placeholder="Nombre de la plantilla"><button id="tSave" class="go">Guardar</button></div></details>
-        <details class="dcard"><summary>Ayuda</summary><p class="hint">Clic en PREVIEW selecciona. Mayús + clic suma elementos. Doble clic entra en un grupo. Arrastra para mover y usa el cuadro de la esquina para cambiar el tamaño (en grupos siempre mantiene proporciones). Flechas del teclado: mover 1 px, con Mayús 10 px.</p></details>
+        <details class="dcard"><summary>Ayuda</summary><p class="hint">Clic en PREVIEW selecciona. Mayús + clic suma elementos. Doble clic entra en un grupo. Arrastra para mover y usa el cuadro de la esquina para cambiar el tamaño (en grupos siempre mantiene proporciones). Flechas del teclado: mover 1 px, con Mayús 10 px. Clic derecho sobre un elemento: copiar, pegar o eliminar. Atajos: Ctrl + C, Ctrl + V, Ctrl + Z (deshacer) y Ctrl + Y (rehacer). El editor muestra siempre el gráfico que estás editando, aunque su switch esté apagado.</p></details>
       </div>
       <div id="insp" class="dmain"></div>
     </div>

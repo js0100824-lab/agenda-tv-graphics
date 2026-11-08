@@ -11,6 +11,7 @@ const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '
 const mk$ = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 const prev = createStage($('mPrev'), { placeholders: true }), prog = createStage($('mProg'));
+const ed = createStage($('mEd'), { placeholders: true, static: true });   // editor propio de la pestaña Diseño (independiente de PREVIEW y PROGRAMA)
 let sel = 'headline', tab = 'op', editingH = null, loopOn = false, animElId = null;
 const STAGE = { x: 0, y: 0, w: 1920, h: 1080 };
 
@@ -80,10 +81,8 @@ function setTab(t) {
   tab = t;
   document.querySelectorAll('#nav a').forEach(x => x.classList.toggle('on', x.dataset.tab === t));
   document.querySelectorAll('.tab').forEach(x => x.hidden = x.id !== 'tab-' + t);
-  if (t !== 'design') closeBig();
-  $('bigOpen').hidden = t !== 'design';
-  if (t === 'design' && draftOf() && !draftOf().visible) store.mutate(sel, () => {});
-  render(store.get());
+  store.setAutoPreview(t !== 'design');   // en Diseño, editar NO enciende el switch de PREVIEW
+  hideCtx(); render(store.get());
 }
 document.querySelectorAll('#nav a').forEach(a => a.onclick = () => setTab(a.dataset.tab));
 
@@ -135,7 +134,7 @@ $('swToggle').onclick = () => {
 };
 function newBlankGraphic() {   // crea OTRO gráfico vacío; el gráfico seleccionado no se toca
   const name = (prompt('Nombre del nuevo gráfico en blanco:', 'Gráfico ' + (Object.keys(SLOTS).length + 1)) || '').trim(); if (!name) return null;
-  const id = store.addSlot(name); selectSlot(id); store.preview(id); return id;
+  const id = store.addSlot(name); selectSlot(id); if (tab !== 'design') store.preview(id); return id;
 }
 $('tBlank').onclick = newBlankGraphic;
 function buildLive(s) {
@@ -241,7 +240,7 @@ async function toggleLoop() {
 document.querySelectorAll('[data-pv]').forEach(b => b.onclick = () => b.dataset.pv === 'loop' ? toggleLoop() : playTest(b.dataset.pv));
 
 // ---------- Imágenes (PNG / JPG / WebP) ----------
-function pickImage(cb) {
+function pickImage(cb, maxSide = 800, maxLen = 3e6) {
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/png,image/jpeg,image/webp';
   inp.onchange = async () => {
     const f = inp.files[0]; if (!f) return;
@@ -249,10 +248,14 @@ function pickImage(cb) {
     const url = URL.createObjectURL(f);
     try {
       const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = url; });
-      const k = Math.min(1, 800 / Math.max(img.naturalWidth, img.naturalHeight)), w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
-      const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h);
-      const src = c.toDataURL(f.type === 'image/jpeg' ? 'image/jpeg' : 'image/png', .92);   // PNG/WebP conservan transparencia
-      if (src.length > 3e6) { alert('La imagen es demasiado pesada. Usa una más pequeña.'); return; }
+      let k = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight)), src = '';
+      for (let i = 0; i < 5; i++) {   // si pesa demasiado se reduce poco a poco
+        const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
+        const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h);
+        src = c.toDataURL(f.type === 'image/jpeg' ? 'image/jpeg' : 'image/png', .9);   // PNG/WebP conservan transparencia
+        if (src.length <= maxLen) break; k *= .75;
+      }
+      if (src.length > maxLen) { alert('La imagen es demasiado pesada. Usa una más pequeña.'); return; }
       cb({ src, ar: img.naturalWidth / img.naturalHeight });
     } catch { alert('No se pudo leer la imagen.'); } finally { URL.revokeObjectURL(url); }
   };
@@ -453,6 +456,16 @@ function buildActions(e) {
 function moveZ(d) {
   store.mutate(sel, g => { const i = g.elements.findIndex(e => e.id === S().id), j = i + d; if (i < 0 || j < 0 || j >= g.elements.length) return; [g.elements[i], g.elements[j]] = [g.elements[j], g.elements[i]]; });
 }
+const TEXFIT = [['cover', 'Rellenar (recorta lo que sobre)'], ['contain', 'Ajustar completa'], ['stretch', 'Estirar a la forma'], ['tile', 'Mosaico (repetir)']];
+function buildTexture(e) {   // carga una imagen dentro de la forma o del cuadro de texto
+  const w = mk$('div'), st = mk$('p', 'hint'), row = mk$('div', 'arow');
+  st.dataset.tex = '1';
+  const up = mk$('button', 'go', 'Cargar textura'), rm = mk$('button', '', 'Quitar textura');
+  up.onclick = () => pickImage(r => edit(e.id, x => { x.tex = r.src; if (!x.texFit) x.texFit = 'cover'; }), 1000, 1.5e6);
+  rm.onclick = () => edit(e.id, x => { delete x.tex; });
+  row.append(up, rm); w.append(st, row, grid([['texFit', 'Ajuste de la textura', 'select', TEXFIT], ['texScale', 'Tamaño del mosaico (px)', 'num', { min: 8, max: 2000 }]], e.id));
+  return card('Textura', w);
+}
 function renderInsp(box, e, kind) {
   if (!e) { box.dataset.k = ''; box.innerHTML = '<p class="hint">Selecciona un elemento.</p>'; return; }
   const key = [sel, kind, e.id, e.type].join('|');
@@ -463,6 +476,7 @@ function renderInsp(box, e, kind) {
     else box.append(card('General', grid([['name', 'Nombre', 'text'], ['on', 'Visible', 'check'], ['locked', 'Bloquear posición', 'check']], e.id)));
     box.append(card(kind === 'ticker' ? 'Altura y posición de la cinta' : 'Posición y tamaño', grid(GEO, e.id)));
     (SECTIONS[e.type] || []).forEach(([t, specs]) => box.append(card(t, grid(specs, e.id))));
+    if (e.type === 'shape' || e.type === 'text') box.append(buildTexture(e));
     if (e.type === 'ticker' && kind !== 'ticker') box.append(mk$('p', 'hint', 'Las noticias se editan en la pestaña Cintilla.'));
     if (kind !== 'ticker') box.append(buildActions(e));
   }
@@ -470,8 +484,9 @@ function renderInsp(box, e, kind) {
     const p = i.dataset.p, t = i.dataset.t, v = e[p];
     if (t === 'coloropt') { const [c, k] = i.children; c.checked = !!v; if (v) k.value = v; return; }
     if (document.activeElement === i) return;
-    if (t === 'check') i.checked = !!v; else i.value = v ?? '';
+    if (t === 'check') i.checked = !!v; else i.value = (p === 'texFit' && !v) ? 'cover' : (p === 'texScale' && !v) ? 200 : (v ?? '');
   });
+  box.querySelectorAll('[data-tex]').forEach(n => { n.textContent = e.tex ? 'Textura cargada. Se ve dentro del elemento; el color queda de fondo.' : 'Sin textura. Carga una imagen (PNG, JPG o WebP) para rellenar este elemento.'; });
   box.querySelectorAll('[data-raw]').forEach(t => { if (document.activeElement !== t) t.value = e.raw ?? arr(e.items).join('\n'); });
   box.querySelectorAll('[data-split]').forEach(i => { if (document.activeElement !== i) i.value = e.split || 'auto'; });
   box.querySelectorAll('[data-list]').forEach(d => {   // lista de noticias detectadas, para ver dónde termina cada una
@@ -510,11 +525,11 @@ function renderTickerTab(g) {
   renderInsp(box, tk, 'ticker');
 }
 
-// ---------- Selección y movimiento directo en PREVIEW ----------
+// ---------- Selección y movimiento directo en el editor ----------
 const ovl = mk$('div', 'ovl'), lbl = mk$('div', 'lbl'), hd = mk$('div', 'hd'), hov = mk$('div', 'hov'), pool = [];
-ovl.append(lbl, hd); prev.el.append(ovl, hov);
+ovl.append(lbl, hd); ed.el.append(ovl, hov);
 function outline(i, r) {
-  let d = pool[i]; if (!d) { d = mk$('div', 'ovl2'); prev.el.append(d); pool[i] = d; }
+  let d = pool[i]; if (!d) { d = mk$('div', 'ovl2'); ed.el.append(d); pool[i] = d; }
   Object.assign(d.style, { display: 'block', left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px' });
 }
 function drawOvl() {
@@ -529,18 +544,19 @@ function drawOvl() {
 }
 function hitAt(ev) {   // elemento visible más alto bajo el puntero
   const g = draftOf(); if (!g) return null;
-  const r = prev.el.getBoundingClientRect(), k = 1 / prev.scale(), px = (ev.clientX - r.left) * k, py = (ev.clientY - r.top) * k;
+  const r = ed.el.getBoundingClientRect(), k = 1 / ed.scale(), px = (ev.clientX - r.left) * k, py = (ev.clientY - r.top) * k;
   return elsOf(g).slice().reverse().find(e => e.on !== false && px >= e.x && px <= e.x + e.w && py >= e.y && py <= e.y + e.h) || null;
 }
 let drag = null;
 ovl.addEventListener('pointerdown', ev => {
+  if (ev.button !== 0) return;
   const g = draftOf(), t = target(); if (!t.els.length || isLocked(g, t)) return;
   drag = { rs: ev.target.classList.contains('hd'), sx: ev.clientX, sy: ev.clientY, snap: t.els.map(clone), box: bb(t.els), single: !t.group && t.els.length === 1 };
   ovl.setPointerCapture(ev.pointerId); ev.preventDefault();
 });
 ovl.addEventListener('pointermove', ev => {
   if (!drag) return;
-  const k = 1 / prev.scale(), dx = (ev.clientX - drag.sx) * k, dy = (ev.clientY - drag.sy) * k;
+  const k = 1 / ed.scale(), dx = (ev.clientX - drag.sx) * k, dy = (ev.clientY - drag.sy) * k;
   store.mutate(sel, g => {   // todo se calcula desde el estado inicial: las posiciones relativas no se pierden
     if (!drag.rs) { drag.snap.forEach(o => { const e = byId(g, o.id); if (e) { e.x = Math.round(o.x + dx); e.y = Math.round(o.y + dy); } }); return; }
     if (drag.single) {
@@ -554,19 +570,19 @@ ovl.addEventListener('pointermove', ev => {
   });
 });
 ovl.addEventListener('pointerup', () => { drag = null; });
-prev.el.addEventListener('pointerdown', ev => {   // clic en el PREVIEW selecciona lo que hay debajo
-  if (tab !== 'design' || ev.target.closest('.ovl')) return;
+ed.el.addEventListener('pointerdown', ev => {   // clic en el PREVIEW selecciona lo que hay debajo
+  if (tab !== 'design' || ev.button !== 0 || ev.target.closest('.ovl')) return;
   const h = hitAt(ev); if (!h) return;
   if (ev.shiftKey || ev.ctrlKey || ev.metaKey) toggleMulti(h.id);
   else if (h.group && grpOf(draftOf())[h.group]) selectGroup(h.group); else selectOne(h.id);
 });
-prev.el.addEventListener('dblclick', ev => { if (tab !== 'design') return; const h = hitAt(ev); if (h) selectOne(h.id); });   // doble clic: elemento suelto dentro de un grupo
-prev.el.addEventListener('pointermove', ev => {
+ed.el.addEventListener('dblclick', ev => { if (tab !== 'design') return; const h = hitAt(ev); if (h) selectOne(h.id); });   // doble clic: elemento suelto dentro de un grupo
+ed.el.addEventListener('pointermove', ev => {
   if (tab !== 'design' || drag) { hov.style.display = 'none'; return; }
   const h = hitAt(ev); if (!h || S().multi.has(h.id)) { hov.style.display = 'none'; return; }
   Object.assign(hov.style, { display: 'block', left: h.x + 'px', top: h.y + 'px', width: h.w + 'px', height: h.h + 'px' });
 });
-prev.el.addEventListener('pointerleave', () => { hov.style.display = 'none'; });
+ed.el.addEventListener('pointerleave', () => { hov.style.display = 'none'; });
 addEventListener('keydown', ev => {   // flechas: mover 1 px (Mayús = 10 px) lo seleccionado
   if (tab !== 'design' || /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '')) return;
   const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[ev.key]; if (!d) return;
@@ -641,16 +657,8 @@ function renderTpl() {
   mine.forEach(t => addCard($('tplMine'), t, true));
 }
 
-// ---------- Vista previa grande (pestaña Diseño) ----------
-const pvBox = $('pvBox'), bigSync = [], bigInfo = mk$('span', 'binfo');
-function closeBig() { pvBox.classList.remove('big'); $('bigBar').hidden = true; $('bigOpen').textContent = 'Ampliar'; }
-function toggleBig() {
-  if (pvBox.classList.contains('big')) { closeBig(); return; }
-  if (tab !== 'design') return;
-  pvBox.classList.add('big'); $('bigBar').hidden = false; $('bigOpen').textContent = 'Cerrar (Esc)';
-}
-$('bigOpen').onclick = $('bigPv').onclick = toggleBig;
-addEventListener('keydown', ev => { if (ev.key === 'Escape') closeBig(); });
+// ---------- Barra del editor (pestaña Diseño) ----------
+const bigSync = [], bigInfo = mk$('span', 'binfo');
 (() => {
   const bar = $('bigBar'), mkb = (t, f) => { const b = mk$('button', '', t); b.onclick = f; bar.append(b); return b; };
   bar.append(bigInfo);
@@ -659,12 +667,79 @@ addEventListener('keydown', ev => { if (ev.key === 'Escape') closeBig(); });
   ALIGNS.forEach(([m, t]) => mkb(t, () => align(m))); mkb('Distribuir H', () => distribute('h')); mkb('Distribuir V', () => distribute('v'));
 })();
 
+// ---------- Deshacer / rehacer ----------
+const doUndo = () => { store.undo(sel); $('fields').dataset.k = ''; };
+const doRedo = () => { store.redo(sel); $('fields').dataset.k = ''; };
+$('edUndo').onclick = doUndo; $('edRedo').onclick = doRedo;
+addEventListener('pointerdown', () => store.markStep(), true);   // cada clic o arrastre nuevo abre un paso del historial
+
+// ---------- Copiar y pegar elementos entre gráficos (fuentes) ----------
+let clip = null; const pasteN = {};
+try { clip = JSON.parse(localStorage.getItem('atg_clip') || 'null'); } catch { clip = null; }
+function copySel() {
+  const g = draftOf(), t = target(); if (!g || !t.els.length) return false;
+  const groups = {}; t.els.forEach(e => { if (e.group && grpOf(g)[e.group]) groups[e.group] = clone(grpOf(g)[e.group]); });
+  clip = { els: clone(t.els), groups, from: sel }; for (const k in pasteN) delete pasteN[k];
+  try { localStorage.setItem('atg_clip', JSON.stringify(clip)); } catch { /* imágenes muy pesadas: queda solo en memoria */ }
+  render(store.get()); return true;
+}
+function pasteClip() {
+  if (!clip || !clip.els || !clip.els.length || !draftOf()) return;
+  const n = (pasteN[sel] = (pasteN[sel] || 0) + 1), off = clip.from === sel ? 30 * n : 30 * (n - 1), ngs = {};
+  const els = clip.els.map(o => {
+    const e = clone(o); e.id = uid(); e.x = (+e.x || 0) + off; e.y = (+e.y || 0) + off;
+    if (o.group && clip.groups[o.group]) { ngs[o.group] = ngs[o.group] || uid(); e.group = ngs[o.group]; } else delete e.group;
+    return e;
+  });
+  store.mutate(sel, g => { g.groups = g.groups || {}; for (const k in ngs) g.groups[ngs[k]] = clone(clip.groups[k]); els.forEach(e => g.elements.push(e)); cleanGroups(g); });
+  const gids = Object.values(ngs), s = S(), ids = els.map(e => e.id);
+  if (gids.length === 1 && els.every(e => e.group)) selectGroup(gids[0]);
+  else { s.grp = null; s.multi = new Set(ids); s.id = ids[ids.length - 1]; render(store.get()); }
+}
+function deleteSel() {
+  const t = target(), g = draftOf(); if (!t.els.length || isLocked(g, t)) return;
+  const ids = new Set(t.els.map(e => e.id));
+  store.mutate(sel, g2 => { g2.elements = g2.elements.filter(x => !ids.has(x.id)); cleanGroups(g2); });
+  const s = S(); s.id = null; s.grp = null; s.multi = new Set(); render(store.get());
+}
+$('edCopy').onclick = copySel; $('edPaste').onclick = pasteClip;
+function syncEditTools() {
+  $('edUndo').disabled = !store.canUndo(sel); $('edRedo').disabled = !store.canRedo(sel);
+  const t = target(); $('edCopy').disabled = !t.els.length; $('edPaste').disabled = !(clip && clip.els && clip.els.length);
+  $('clipInfo').textContent = clip && clip.els && clip.els.length ? `Copiado: ${clip.els.length === 1 ? (clip.els[0].name || clip.els[0].type) : clip.els.length + ' elementos'}` : '';
+}
+
+// Menú del clic derecho sobre el editor
+const ctx = mk$('div', 'ctx'); ctx.hidden = true; document.body.append(ctx);
+function hideCtx() { ctx.hidden = true; }
+ed.el.addEventListener('contextmenu', ev => {
+  ev.preventDefault(); if (tab !== 'design') return;
+  const h = hitAt(ev); if (h && !S().multi.has(h.id)) { if (h.group && grpOf(draftOf())[h.group]) selectGroup(h.group); else selectOne(h.id); }
+  const has = target().els.length > 0; ctx.innerHTML = '';
+  const item = (t, f, dis, cls) => { const b = mk$('button', cls || '', t); b.disabled = !!dis; b.onclick = () => { hideCtx(); f(); }; ctx.append(b); };
+  item('Copiar', copySel, !has); item('Pegar', pasteClip, !(clip && clip.els && clip.els.length)); item('Eliminar', deleteSel, !has, 'danger');
+  ctx.hidden = false; ctx.style.left = Math.min(ev.clientX, innerWidth - 190) + 'px'; ctx.style.top = Math.min(ev.clientY, innerHeight - 130) + 'px';
+});
+addEventListener('pointerdown', ev => { if (!ev.target.closest('.ctx')) hideCtx(); }, true);
+addEventListener('keydown', ev => {
+  if (ev.key === 'Escape') { hideCtx(); return; }
+  if (tab !== 'design' || !(ev.ctrlKey || ev.metaKey) || /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '')) return;
+  const k = ev.key.toLowerCase();
+  if (k === 'z' && !ev.shiftKey) { ev.preventDefault(); doUndo(); }
+  else if (k === 'y' || (k === 'z' && ev.shiftKey)) { ev.preventDefault(); doRedo(); }
+  else if (k === 'c') { if (copySel()) ev.preventDefault(); }
+  else if (k === 'v') { if (clip) { ev.preventDefault(); pasteClip(); } }
+});
+
 // ---------- Render general ----------
 function render(s) {
   if (!SLOTS[sel]) sel = 'headline';
   prev.apply(s.draft); prog.apply(s.program); buildEditbar(); buildAirpad(s);
+  $('monitors').classList.toggle('off', tab === 'design');   // en Diseño solo se ve el editor (los monitores siguen montados fuera de pantalla)
   const g = s.draft[sel]; if (!g) return;
   fixSel(g); buildLive(s);
+  ed.apply(tab === 'design' ? { [sel]: { ...g, visible: true } } : {});   // el editor siempre muestra lo que editas, esté el switch encendido o no
+  if (tab === 'design') syncEditTools();
   if (tab === 'op') { syncContent(g); renderAnim($('animQuick'), g, false); }
   if (tab === 'design') {
     renderList(g); renderSelUI(g);

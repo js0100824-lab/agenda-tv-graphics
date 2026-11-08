@@ -85,10 +85,14 @@ button{font:inherit}
 .bigbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;width:100%;margin-bottom:8px}
 .bigbar button{padding:6px 10px;border:0;border-radius:3px;background:#2a3340;color:#fff;cursor:pointer;font-weight:600}
 .bigbar button:disabled{opacity:.4;cursor:not-allowed}.bigbar .binfo{color:#f5c451;font-size:13px;margin-right:10px}.bigbar .bsep{width:14px}
-#pvBox.big{position:fixed;inset:0;z-index:100;background:#0b0d10;padding:10px 16px;display:flex;flex-direction:column;align-items:center}
-#pvBox.big .pvh{width:100%}
-#pvBox.big .mon{width:min(100%,calc((100vh - 130px)*16/9));flex:none}
-
+.monitors.off{position:fixed;left:-10000px;top:0;width:1200px;visibility:hidden;pointer-events:none}
+.edwrap{margin-bottom:16px}
+.mon.ed{width:min(100%,calc((100vh - 270px)*16/9));min-width:480px;margin:0 auto;touch-action:none}
+.ctx{position:fixed;z-index:200;min-width:170px;background:#12161b;border:1px solid #38bdf8;border-radius:6px;padding:4px;box-shadow:0 8px 24px rgba(0,0,0,.6)}
+.ctx button{display:block;width:100%;text-align:left;padding:8px 12px;border:0;border-radius:4px;background:none;color:#fff;cursor:pointer;font-weight:600}
+.ctx button:hover:not(:disabled){background:#0b2a44}.ctx button:disabled{opacity:.4;cursor:not-allowed}.ctx .danger{background:none!important;color:#f87171}
+.dtool button:disabled{opacity:.4;cursor:not-allowed}
+.dtool .hint{margin:0}
 /* ---- Pestaña Diseño ---- */
 .dtool{display:flex;flex-wrap:wrap;gap:12px 32px;align-items:center;padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid #232a33}
 .dgrp{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
