@@ -252,3 +252,11 @@ main.nosrc #opMain,main.nosrc #tab-design>*,main.nosrc #tab-ticker>*,main.nosrc 
 
 .swmgr .gone{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.swmgr .gone .hint{margin:0;flex-basis:100%}
 .swmgr .gone button{padding:7px 12px;border:0;border-radius:4px;background:#2a3340;color:#fff;cursor:pointer;font-weight:600}
+
+/* Avisos propios (sustituyen las alertas del navegador) */
+.dlg.msg{z-index:300}
+.dbox.sm{width:min(440px,100%)}
+.mdtext{margin:0 0 14px;white-space:pre-line;line-height:1.45;font-size:14px;color:#e6edf5}
+#mdInput{width:100%;padding:10px;margin:0 0 14px;background:#0d1014;border:1px solid #2a3340;color:#fff;border-radius:4px;font:inherit}
+#mdInput:focus{outline:2px solid #1565ff;border-color:#1565ff}
+#mdOk.danger{background:#b42323!important}

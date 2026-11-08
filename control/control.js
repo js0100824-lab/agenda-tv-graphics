@@ -10,6 +10,31 @@ const clone = o => JSON.parse(JSON.stringify(o));
 const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const mk$ = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
+// ---------- Avisos propios (sustituyen alert / confirm / prompt del navegador) ----------
+let msgQueue = Promise.resolve(), msgCancel = null;
+function uiDialog({ text, input, value, ok, cancel, danger }) {   // una a la vez: si se piden varias, esperan su turno
+  const run = () => new Promise(res => {
+    const dlg = $('msgDlg'), inp = $('mdInput'), okb = $('mdOk'), cb = $('mdCancel'), back = document.activeElement;
+    $('mdText').textContent = text; inp.hidden = !input; inp.value = value || ''; okb.textContent = ok; cb.hidden = !cancel;
+    okb.classList.toggle('danger', !!danger); dlg.hidden = false;
+    const done = v => { dlg.hidden = true; msgCancel = null; dlg.onkeydown = dlg.onpointerdown = okb.onclick = cb.onclick = null; if (back && back.focus) try { back.focus(); } catch { /* nada */ } res(v); };
+    const no = () => done(input ? null : false), yes = () => done(input ? inp.value : true);
+    msgCancel = cancel ? no : yes;   // Esc: cancela (en un aviso simple, solo cierra)
+    okb.onclick = yes; cb.onclick = no;
+    dlg.onpointerdown = e => { if (e.target === dlg && cancel) no(); };
+    dlg.onkeydown = e => { if (e.key === 'Enter' && e.target !== cb) { e.preventDefault(); yes(); } };
+    (input ? inp : okb).focus(); if (input) inp.select();
+  });
+  const r = msgQueue.then(run); msgQueue = r.catch(() => {}); return r;
+}
+const uiAlert = text => uiDialog({ text, ok: 'Entendido', cancel: false });
+function uiConfirm(text, ok) {
+  const w = (/^¿([A-Za-zÁÉÍÓÚáéíóúñ]+)/.exec(text) || [])[1];
+  ok = ok || (w ? w[0].toUpperCase() + w.slice(1) : 'Aceptar');
+  return uiDialog({ text, ok, cancel: true, danger: ok === 'Eliminar' });
+}
+const uiPrompt = (text, value) => uiDialog({ text, input: true, value: value || '', ok: 'Aceptar', cancel: true });
+
 const prev = createStage($('mPrev'), { placeholders: true }), prog = createStage($('mProg'));
 const ed = createStage($('mEd'), { placeholders: true, static: true });   // editor propio de la pestaña Editor (independiente de PREVIEW y PROGRAMA)
 let sel = Object.keys(SLOTS)[0] || null, tab = 'op', editingH = null, loopOn = false, animElId = null;
@@ -147,9 +172,9 @@ function buildAirpad(s) {
     inp.onkeydown = e => { if (e.key === 'Enter') inp.blur(); };
     r.append(mk$('div', 'grip'), inp);
     const x = mk$('button', 'danger', 'Eliminar');
-    x.onclick = () => {
+    x.onclick = async () => {
       const sv = store.sourceProgram(id) ? ' Sigue guardada en su programa.' : ' Si no está guardada en un programa, se pierde su diseño.';
-      if (!confirm(`¿Eliminar la fuente «${SLOTS[id].name}»? Sale de Operación y del aire.${sv}`)) return;
+      if (!await uiConfirm(`¿Eliminar la fuente «${SLOTS[id].name}»? Sale de Operación y del aire.${sv}`)) return;
       if (sel === id) selectSlot(Object.keys(SLOTS).find(k => k !== id) || null);
       if (SLOTS[id].custom) store.removeSlot(id); else store.closeSources([id]);
     };
@@ -184,17 +209,17 @@ function sortRows(list, ids, onMove) {
     r.addEventListener('pointermove', move); r.addEventListener('pointerup', up); r.addEventListener('pointercancel', up);
   }));
 }
-$('edRename').onclick = () => { if (!SLOTS[sel]) return; const n = (prompt('Nuevo nombre de la fuente:', SLOTS[sel].name) || '').trim(); if (n) store.renameSlot(sel, n); };
-$('slotAdd').onclick = () => {
-  const name = (prompt('Nombre de la nueva fuente (por ejemplo: Marcador, Reloj, Logo):') || '').trim(); if (!name) return;
+$('edRename').onclick = async () => { if (!SLOTS[sel]) return; const n = (await uiPrompt('Nuevo nombre de la fuente:', SLOTS[sel].name) || '').trim(); if (n) store.renameSlot(sel, n); };
+$('slotAdd').onclick = async () => {
+  const name = (await uiPrompt('Nombre de la nueva fuente (por ejemplo: Marcador, Reloj, Logo):') || '').trim(); if (!name) return;
   selectSlot(store.addSlot(name));   // nuevo gráfico en blanco: aparece en los switches; se diseña en Editor o Plantillas
 };
 let swOpen = false;
 $('swToggle').onclick = () => {
   swOpen = !swOpen; $('opMain').hidden = swOpen; $('swPanel').hidden = !swOpen; $('swToggle').textContent = swOpen ? 'Ocultar switches' : 'Mostrar switches';
 };
-function newBlankGraphic() {   // crea OTRO gráfico vacío; el gráfico seleccionado no se toca
-  const name = (prompt('Nombre de la nueva fuente en blanco:', 'Fuente ' + (Object.keys(SLOTS).length + 1)) || '').trim(); if (!name) return null;
+async function newBlankGraphic() {   // crea OTRO gráfico vacío; el gráfico seleccionado no se toca
+  const name = (await uiPrompt('Nombre de la nueva fuente en blanco:', 'Fuente ' + (Object.keys(SLOTS).length + 1)) || '').trim(); if (!name) return null;
   const id = store.addSlot(name); selectSlot(id); if (tab !== 'design') store.preview(id); return id;
 }
 $('tBlank').onclick = newBlankGraphic;
@@ -306,7 +331,7 @@ function pickImage(cb, maxSide = 800, maxLen = 3e6) {
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/png,image/jpeg,image/webp';
   inp.onchange = async () => {
     const f = inp.files[0]; if (!f) return;
-    if (!/^image\/(png|jpe?g|webp)$/.test(f.type)) { alert('Formato no permitido. Usa PNG, JPG o WebP.'); return; }
+    if (!/^image\/(png|jpe?g|webp)$/.test(f.type)) { await uiAlert('Formato no permitido. Usa PNG, JPG o WebP.'); return; }
     const url = URL.createObjectURL(f);
     try {
       const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = url; });
@@ -317,9 +342,9 @@ function pickImage(cb, maxSide = 800, maxLen = 3e6) {
         src = c.toDataURL(f.type === 'image/jpeg' ? 'image/jpeg' : 'image/png', .9);   // PNG/WebP conservan transparencia
         if (src.length <= maxLen) break; k *= .75;
       }
-      if (src.length > maxLen) { alert('La imagen es demasiado pesada. Usa una más pequeña.'); return; }
+      if (src.length > maxLen) { await uiAlert('La imagen es demasiado pesada. Usa una más pequeña.'); return; }
       cb({ src, ar: img.naturalWidth / img.naturalHeight });
-    } catch { alert('No se pudo leer la imagen.'); } finally { URL.revokeObjectURL(url); }
+    } catch { await uiAlert('No se pudo leer la imagen.'); } finally { URL.revokeObjectURL(url); }
   };
   inp.click();
 }
@@ -358,15 +383,15 @@ function addAt(kind, pt) {   // añade un elemento; con pt (clic derecho) queda 
 }
 $('addText').onclick = () => addAt('text'); $('addClock').onclick = () => addAt('clock'); $('addShape').onclick = () => addAt('shape'); $('addTicker').onclick = () => addAt('ticker');
 $('addLogo').onclick = () => addAt('logo'); $('addImg').onclick = () => addAt('image');
-$('tSave').onclick = () => {
-  const name = $('tName').value.trim(), g = draftOf(); if (!name) { alert('Escribe un nombre para la plantilla.'); return; }
+$('tSave').onclick = async () => {
+  const name = $('tName').value.trim(), g = draftOf(); if (!name) { await uiAlert('Escribe un nombre para la plantilla.'); return; }
   store.saveTemplate({ name, desc: 'Plantilla personalizada', elements: clone(g.elements), groups: clone(g.groups || {}), anim: clone(g.anim) }); $('tName').value = '';
 };
 
 // ---------- Grupos, bloqueo y alineación ----------
 $('gAll').onclick = () => { const s = S(), ids = elsOf(draftOf()).filter(e => e.on !== false).map(e => e.id); s.grp = null; s.multi = new Set(ids); s.id = ids[ids.length - 1] || null; render(store.get()); };
-$('gGroup').onclick = () => {
-  const ids = [...S().multi]; if (ids.length < 2) { alert('Selecciona al menos 2 elementos (Mayús + clic en la lista o en el editor).'); return; }
+$('gGroup').onclick = async () => {
+  const ids = [...S().multi]; if (ids.length < 2) { await uiAlert('Selecciona al menos 2 elementos (Mayús + clic en la lista o en el editor).'); return; }
   const gid = uid();
   store.mutate(sel, g => {
     g.groups = g.groups || {}; g.groups[gid] = { name: 'Grupo ' + (Object.keys(g.groups).length + 1), locked: false };
@@ -409,9 +434,9 @@ function align(mode) {
     if (multi) els.forEach(e => move([e], e)); else move(els, bb(els));   // un grupo o un elemento se alinea como una sola pieza
   });
 }
-function distribute(axis) {
+async function distribute(axis) {
   const t = target(), g = draftOf();
-  if (t.group || t.els.length < 3) { alert('Selecciona 3 o más elementos sueltos (Mayús + clic) para distribuirlos.'); return; }
+  if (t.group || t.els.length < 3) { await uiAlert('Selecciona 3 o más elementos sueltos (Mayús + clic) para distribuirlos.'); return; }
   if (isLocked(g, t)) return;
   store.mutate(sel, g2 => {
     const P = axis === 'h' ? ['x', 'w'] : ['y', 'h'], els = g2.elements.filter(e => t.els.some(x => x.id === e.id)).sort((a, b) => a[P[0]] - b[P[0]]);
@@ -756,20 +781,20 @@ function snapshot(withDesign) {
   if (withDesign) rec.design = { template: g.template, elements: clone(g.elements), groups: clone(g.groups || {}), anim: clone(g.anim) };
   return rec;
 }
-function loadHeadline(h) {
-  const slot = h.slot && SLOTS[h.slot] ? h.slot : (SLOTS[sel] ? sel : firstSlot()); if (!slot) { alert('No hay fuentes abiertas. Abre un programa o añade una fuente.'); return; } sel = slot; $('fields').dataset.k = '';
+async function loadHeadline(h) {
+  const slot = h.slot && SLOTS[h.slot] ? h.slot : (SLOTS[sel] ? sel : firstSlot()); if (!slot) { await uiAlert('No hay fuentes abiertas. Abre un programa o añade una fuente.'); return; } sel = slot; $('fields').dataset.k = '';
   if (h.design) store.setGraphic(slot, h.design);
   else store.mutate(slot, g => g.elements.forEach(e => { if (e.type === 'text' && e.role && h.texts && e.role in h.texts) e.text = h.texts[e.role]; }));
   render(store.get());
 }
-$('hSave').onclick = () => {
-  if (!draftOf()) { alert('No hay fuentes abiertas.'); return; }
-  const name = $('hName').value.trim(); if (!name) { alert('Escribe un nombre para identificar el titular.'); return; }
+$('hSave').onclick = async () => {
+  if (!draftOf()) { await uiAlert('No hay fuentes abiertas.'); return; }
+  const name = $('hName').value.trim(); if (!name) { await uiAlert('Escribe un nombre para identificar el titular.'); return; }
   store.saveHeadline({ name, ...snapshot($('hDesign').checked) }); $('hName').value = '';
 };
-$('hUpd').onclick = () => {
-  if (!draftOf()) { alert('No hay fuentes abiertas.'); return; }
-  const name = $('hName').value.trim(); if (!name) { alert('Escribe un nombre.'); return; }
+$('hUpd').onclick = async () => {
+  if (!draftOf()) { await uiAlert('No hay fuentes abiertas.'); return; }
+  const name = $('hName').value.trim(); if (!name) { await uiAlert('Escribe un nombre.'); return; }
   store.saveHeadline({ id: editingH, name, ...snapshot($('hDesign').checked) }); stopEdit();
 };
 $('hCancel').onclick = () => stopEdit();
@@ -789,7 +814,7 @@ function renderSaved() {
     b('Cargar', () => loadHeadline(h), 'go');
     b('Editar', () => { editingH = h.id; $('hName').value = h.name; $('hDesign').checked = !!h.design; loadHeadline(h); });
     b('Duplicar', () => { const c = clone(h); delete c.id; c.name = h.name + ' (copia)'; store.saveHeadline(c); });
-    b('Eliminar', () => { if (confirm(`¿Eliminar «${h.name}»?`)) { if (editingH === h.id) editingH = null; store.deleteHeadline(h.id); } }, 'danger');
+    b('Eliminar', async () => { if (await uiConfirm(`¿Eliminar «${h.name}»?`)) { if (editingH === h.id) editingH = null; store.deleteHeadline(h.id); } }, 'danger');
     box.append(r);
   });
 }
@@ -833,13 +858,13 @@ function askSources(title, okText) {   // devuelve una promesa con los ids marca
     $('sdOk').onclick = () => done(checks.filter(c => c.checked).map(c => c.dataset.id));
   });
 }
-addEventListener('keydown', e => { if (e.key === 'Escape' && dlgOk) { e.stopPropagation(); dlgOk(); } }, true);
+addEventListener('keydown', e => { if (e.key === 'Escape' && msgCancel) { e.stopPropagation(); msgCancel(); return; } if (e.key === 'Escape' && dlgOk) { e.stopPropagation(); dlgOk(); } }, true);
 
 $('pSave').onclick = async () => {
-  const name = $('pName').value.trim(); if (!name) { alert('Escribe un nombre para el programa.'); return; }
-  if (!store.sourceIds().length) { alert('No hay fuentes abiertas para guardar.'); return; }
+  const name = $('pName').value.trim(); if (!name) { await uiAlert('Escribe un nombre para el programa.'); return; }
+  if (!store.sourceIds().length) { await uiAlert('No hay fuentes abiertas para guardar.'); return; }
   const same = store.programs().find(p => norm(p.name) === norm(name));
-  if (same && !confirm(`Ya existe un programa llamado «${same.name}». ¿Reemplazarlo con las fuentes que elijas?`)) return;
+  if (same && !await uiConfirm(`Ya existe un programa llamado «${same.name}». ¿Reemplazarlo con las fuentes que elijas?`, 'Reemplazar')) return;
   const ids = await askSources(`¿Qué fuentes quieres guardar en «${name}»?`, 'Guardar'); if (!ids || !ids.length) return;
   await store.saveProgram(name, same && same.id, ids);
   await store.closeSources(ids);   // las fuentes guardadas se cierran: salen de Operación y del aire
@@ -848,13 +873,13 @@ $('pSave').onclick = async () => {
 
 // Cerrar: cierra todas las fuentes que están guardadas en un programa y deja solo las que no lo están
 $('edClose').onclick = async () => {
-  const ids = store.savedOpenIds(); if (!ids.length) { alert('No hay fuentes abiertas desde un programa. Las fuentes que no están guardadas en ningún programa no se cierran.'); return; }
+  const ids = store.savedOpenIds(); if (!ids.length) { await uiAlert('No hay fuentes abiertas desde un programa. Las fuentes que no están guardadas en ningún programa no se cierran.'); return; }
   const ch = store.changedIds(ids), rest = store.sourceIds().length - ids.length;
   let msg = `¿Cerrar ${ids.length === 1 ? 'la fuente' : 'las ' + ids.length + ' fuentes'} guardadas en programas (${listNames(ids)})?\n\n` +
     (rest ? `Se quedan abiertas las ${rest} que no están guardadas en ningún programa.` : 'No quedará ninguna fuente abierta.');
   if (onAir(ids)) msg += '\n\nLo que esté al aire de ellas saldrá del aire.';
   if (ch.length) msg += `\n\nATENCIÓN: tienen cambios sin guardar ${listNames(ch)}. Si cierras, esos cambios se pierden. (Para conservarlos cancela y usa «Actualizar con lo abierto» en Programas.)`;
-  if (!confirm(msg)) return;
+  if (!await uiConfirm(msg)) return;
   await store.closeSources(ids); afterOpen();
 };
 
@@ -873,32 +898,32 @@ function renderProgs() {
       let msg = `¿Abrir «${p.name}»? Se abren ${names.length === 1 ? 'su fuente' : 'sus ' + names.length + ' fuentes'} junto a las que ya tienes abiertas.`;
       if (rep.length) msg += `\n\nYa están abiertas y se reemplazan por lo guardado: ${listNames(rep)}.${onAir(rep) ? ' Lo que esté al aire de ellas saldrá del aire.' : ''}`;
       if (ch.length) msg += `\n\nATENCIÓN: ${listNames(ch)} tiene cambios sin guardar que se perderán.`;
-      if (!confirm(msg)) return;
+      if (!await uiConfirm(msg)) return;
       await store.openProgram(p.id); afterOpen();
     }, 'go');
     b('Actualizar con lo abierto', async () => {
       const ids = store.progOpenIds(p.id);
-      if (!ids.length) { alert(`Ninguna fuente de «${p.name}» está abierta. Ábrelo primero, edita las fuentes y luego actualiza.`); return; }
-      if (!confirm(`¿Actualizar «${p.name}» con lo que tienes ahora en ${listNames(ids)}? Las fuentes de este programa que no estén abiertas se conservan como están.`)) return;
+      if (!ids.length) { await uiAlert(`Ninguna fuente de «${p.name}» está abierta. Ábrelo primero, edita las fuentes y luego actualiza.`); return; }
+      if (!await uiConfirm(`¿Actualizar «${p.name}» con lo que tienes ahora en ${listNames(ids)}? Las fuentes de este programa que no estén abiertas se conservan como están.`)) return;
       await store.saveProgram(p.name, p.id, ids, { merge: true }); renderProgs();
     });
-    b('Renombrar', () => { const n = (prompt('Nuevo nombre del programa:', p.name) || '').trim(); if (n) store.renameProgram(p.id, n); });
+    b('Renombrar', async () => { const n = (await uiPrompt('Nuevo nombre del programa:', p.name) || '').trim(); if (n) store.renameProgram(p.id, n); });
     b('Duplicar', () => store.duplicateProgram(p.id));
-    b('Eliminar', () => { if (confirm(`¿Eliminar el programa «${p.name}»?${opened.length ? ' Sus fuentes abiertas se quedan, pero dejan de estar guardadas.' : ''}`)) store.deleteProgram(p.id); }, 'danger');
+    b('Eliminar', async () => { if (await uiConfirm(`¿Eliminar el programa «${p.name}»?${opened.length ? ' Sus fuentes abiertas se quedan, pero dejan de estar guardadas.' : ''}`)) store.deleteProgram(p.id); }, 'danger');
     box.append(r);
   });
 }
 
 // ---------- Plantillas ----------
 let tplKey = null;
-function useTemplate(t) {
-  if (t.key !== 'blank' && !SLOTS[sel]) { alert('No hay fuentes abiertas. Abre un programa o añade una fuente.'); return; }
-  if (t.key === 'blank') { if (newBlankGraphic() && tab !== 'design') setTab('design'); return; }
+async function useTemplate(t) {
+  if (t.key !== 'blank' && !SLOTS[sel]) { await uiAlert('No hay fuentes abiertas. Abre un programa o añade una fuente.'); return; }
+  if (t.key === 'blank') { if (await newBlankGraphic() && tab !== 'design') setTab('design'); return; }
   store.setGraphic(sel, instantiate(t, draftOf())); const s = S(); s.id = null; s.grp = null; s.multi = new Set(); $('fields').dataset.k = ''; render(store.get());
 }
 function addCard(grid, t, del) {
   const c = mk$('div', 'tcard'), th = mk$('div', 'thumb'); c.append(th); grid.append(c);
-  const b = mk$('b', '', t.name); if (del) { const x = mk$('button', 'tdel', 'Eliminar'); x.onclick = ev => { ev.stopPropagation(); if (confirm(`¿Eliminar la plantilla «${t.name}»?`)) store.deleteTemplate(t.id); }; b.prepend(x); }
+  const b = mk$('b', '', t.name); if (del) { const x = mk$('button', 'tdel', 'Eliminar'); x.onclick = async ev => { ev.stopPropagation(); if (await uiConfirm(`¿Eliminar la plantilla «${t.name}»?`)) store.deleteTemplate(t.id); }; b.prepend(x); }
   c.append(b, mk$('small', '', t.desc || ''));
   c.onclick = () => useTemplate(t);
   createStage(th, { static: true, placeholders: true }).apply({ x: { visible: true, elements: t.elements, anim: t.anim } });

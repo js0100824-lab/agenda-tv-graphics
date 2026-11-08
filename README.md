@@ -94,3 +94,6 @@ Sin `databaseURL` funciona en modo local (mismo navegador), solo para pruebas.
 - **Eliminar en todas las fuentes**: también las tres del inicio (Gráfico principal, Cintilla inferior, Nombre / cargo) tienen «Eliminar» en la lista de switches. Al eliminarlas salen de Operación y del aire; bajo la lista aparece «Restaurar … en blanco» para traerlas de nuevo.
 - **Cada fuente vuelve a su lugar**: al guardar un programa (o eliminar una fuente) y volver a abrirla, ocupa la misma posición que tenía en los switches; ya no se va al final. El orden completo se guarda en `/slotOrder`.
 - La pestaña **Diseño** ahora se llama **Editor**.
+
+## Versión 13c
+- **Avisos propios**: se quitaron las alertas del navegador (las ventanas de Chrome). Ahora los avisos, las confirmaciones (con botón rojo «Eliminar» cuando borra algo) y los cuadros para escribir nombres (nueva fuente, renombrar fuente o programa) son ventanas del propio panel. Enter acepta y Esc cancela.
