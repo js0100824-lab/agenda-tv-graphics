@@ -11,11 +11,20 @@ export const SLOTS = {
   nameplate: { name: 'Nombre / cargo',    tpl: 'nameplate', layer: 3 }
 };
 
+// Orden de los botones de los switches (se guarda en /slotOrder). Las claves de SLOTS siguen ese orden en todo el panel.
+let ORDER = [];
+export function applyOrder(order) {
+  ORDER = Array.isArray(order) ? order : (order && typeof order === 'object' ? Object.values(order) : []);
+  const ids = Object.keys(SLOTS), want = [...ORDER.filter(i => SLOTS[i]), ...ids.filter(i => !ORDER.includes(i))];
+  const rec = want.map(i => [i, SLOTS[i]]); ids.forEach(k => delete SLOTS[k]); rec.forEach(([k, v]) => { SLOTS[k] = v; });
+}
+
 // Gráficos adicionales creados por el usuario (se guardan en /slots y se suman a los tres integrados)
 export function setCustomSlots(map) {
   for (const k of Object.keys(SLOTS)) if (SLOTS[k].custom) delete SLOTS[k];
   Object.entries(map || {}).filter(([, v]) => v).sort((a, b) => (a[1].ts || 0) - (b[1].ts || 0))
     .forEach(([id, v]) => { if (!SLOTS[id]) SLOTS[id] = { name: v.name || 'Gráfico', tpl: 'blank', custom: true, layer: 4 }; });
+  applyOrder(ORDER);
 }
 
 // Capa de cada gráfico: la cintilla va siempre por encima; el resto entra por detrás de ella.

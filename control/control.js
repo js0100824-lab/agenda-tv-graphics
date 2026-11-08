@@ -126,13 +126,23 @@ function buildAirpad(s) {
     ids.forEach(id => {
       const on = isProg ? live(id) : view(id);
       const b = mk$('button', 'sbtn ' + (isProg ? 'prog' : 'prev') + (on ? ' on' : '') + (!isProg && id === sel ? ' sel' : ''), SLOTS[id].name);
-      b.onclick = () => isProg ? toggleAir(id) : toggleView(id); row.append(b);
+      b.onclick = () => isProg ? toggleAir(id) : toggleView(id);
+      b.draggable = true;   // arrastrar un botón sobre otro cambia su posición
+      b.ondragstart = e => { e.dataTransfer.setData('text/plain', id); e.dataTransfer.effectAllowed = 'move'; b.classList.add('drag'); };
+      b.ondragend = () => b.classList.remove('drag');
+      b.ondragover = e => { e.preventDefault(); b.classList.add('over'); };
+      b.ondragleave = () => b.classList.remove('over');
+      b.ondrop = e => { e.preventDefault(); const from = e.dataTransfer.getData('text/plain'); if (from && from !== id) store.moveSlot(from, ids.indexOf(id)); };
+      row.append(b);
     });
   });
   const mg = $('swMgr'); mg.innerHTML = ''; mg.className = 'swmgr';
-  ids.filter(id => SLOTS[id].custom).forEach(id => {
-    const r = mk$('div', 'mrow'), add = (t, f) => { const x = mk$('button', t === 'Eliminar' ? 'danger' : '', t); x.onclick = f; r.append(x); };
+  mg.append(mk$('p', 'hint', 'Para cambiar el orden de los botones, arrástralos o usa «Antes» y «Después». El orden se guarda y se aplica también en «Editando».'));
+  ids.forEach((id, i) => {
+    const r = mk$('div', 'mrow'), add = (t, f, dis) => { const x = mk$('button', t === 'Eliminar' ? 'danger' : '', t); x.disabled = !!dis; x.onclick = f; r.append(x); };
     r.append(mk$('span', '', SLOTS[id].name));
+    add('Antes', () => store.moveSlot(id, i - 1), i === 0); add('Después', () => store.moveSlot(id, i + 1), i === ids.length - 1);
+    if (!SLOTS[id].custom) { mg.append(r); return; }
     add('Renombrar', () => { const n = (prompt('Nuevo nombre:', SLOTS[id].name) || '').trim(); if (n) store.renameSlot(id, n); });
     add('Eliminar', () => { if (confirm(`¿Eliminar el gráfico «${SLOTS[id].name}»? Se borra también su diseño.`)) { if (sel === id) selectSlot('headline'); store.removeSlot(id); } });
     mg.append(r);
@@ -489,12 +499,11 @@ function renderInsp(box, e, kind) {
   if (box.dataset.k !== key) {
     box.dataset.k = key; box.innerHTML = '';
     const head = mk$('div', 'dhead'); head.append(mk$('span', 'dtype', TYPE[e.type] || ''), mk$('b', '', e.name || e.type)); box.append(head);
-    if (kind === 'ticker') box.append(card('Noticias', buildNews(e)));
-    else box.append(card('General', grid([['name', 'Nombre', 'text'], ['on', 'Visible', 'check'], ['locked', 'Bloquear posición', 'check']], e.id)));
+    if (kind !== 'ticker') box.append(card('General', grid([['name', 'Nombre', 'text'], ['on', 'Visible', 'check'], ['locked', 'Bloquear posición', 'check']], e.id)));
+    if (e.type === 'ticker') { const nc = card('Noticias', buildNews(e)); nc.classList.add('span'); box.append(nc); }   // las noticias también se editan aquí, en Diseño
     box.append(card(kind === 'ticker' ? 'Altura y posición de la cinta' : 'Posición y tamaño', grid(GEO, e.id)));
     (SECTIONS[e.type] || []).forEach(([t, specs]) => box.append(card(t, grid(specs, e.id))));
     if (e.type === 'shape' || e.type === 'text') box.append(buildTexture(e));
-    if (e.type === 'ticker' && kind !== 'ticker') box.append(mk$('p', 'hint', 'Las noticias se editan en la pestaña Cintilla.'));
     if (kind !== 'ticker') box.append(buildActions(e));
   }
   box.querySelectorAll('[data-p]').forEach(i => {

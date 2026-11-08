@@ -152,7 +152,7 @@ main.dsg .editbar{position:sticky;top:0;z-index:30;background:#111418;padding:6p
   main{overflow:visible;padding:10px;gap:10px;min-width:0}
   .panel{padding:10px}#tab-design{padding:0}
   .dstick{display:contents}
-  .edwrap{position:sticky;top:var(--ah,90px);z-index:20;background:#171b21;padding:8px 10px;border-radius:4px 4px 0 0;box-shadow:0 8px 10px -8px rgba(0,0,0,.7)}
+  .edwrap{position:sticky;top:var(--ah,90px);z-index:20;background:#171b21;padding:26px 16px 10px;border-radius:4px 4px 0 0;box-shadow:0 8px 10px -8px rgba(0,0,0,.7)}
   .dtool{padding:12px 10px 0}.dright{padding:12px 10px}
   main.dsg .editbar{position:static}
   .mon.ed{width:100%}
@@ -181,3 +181,21 @@ main.dsg .editbar{position:sticky;top:0;z-index:30;background:#111418;padding:6p
 .elist .ename{flex:none;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
 .elist .etype{min-width:0;font-size:9px}
 .egrp{display:flex;flex-wrap:wrap;gap:6px;padding:6px;border:1px dashed #f59e0b;border-radius:6px}
+
+/* ---- Editor completo: los bordes y tiradores no se cortan en los límites del escenario ---- */
+.mon.ed,.mon.ed .stage{overflow:visible}
+.edwrap{padding:28px 20px 14px}
+.mon.ed{width:min(100%,70vh)}
+.dstick{padding-top:0}
+
+/* ---- Tarjetas como cuadros que se acomodan al ancho ---- */
+.dright,.dmain{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:12px;align-items:start}
+.dright>.span,.dright>#insp,.dmain>.span,.dmain>.dhead,.dmain>.hint,.dmain>h3,.dmain>.grid2,.dmain>.arow{grid-column:1/-1}
+.dmain>h3{margin:0}
+.gx{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+.dcard{min-width:0}
+
+/* ---- Orden de los switches ---- */
+.sbtn.drag{opacity:.4}.sbtn.over{outline:2px dashed #38bdf8;outline-offset:2px}
+.swmgr button:disabled{opacity:.4;cursor:not-allowed}
+.swmgr .hint{margin:0 0 4px}

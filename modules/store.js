@@ -1,7 +1,7 @@
 // Estado central: /draft (lo que editas y ves en PREVIEW) y /program (lo que ve OBS).
 // Además: /headlines (titulares guardados) y /templates (plantillas personalizadas).
 import * as db from './firebase.js';
-import { SLOTS, newGraphic, arr, uid, setCustomSlots } from './templates.js';
+import { SLOTS, newGraphic, arr, uid, setCustomSlots, applyOrder } from './templates.js';
 
 const state = { draft: {}, program: {}, headlines: {}, templates: {}, slots: {} };
 const subs = new Set();
@@ -36,6 +36,7 @@ export async function init() {
     for (const id in SLOTS) if (!state.draft[id]) state.draft[id] = newGraphic(id);
     emit();
   });
+  db.watch('slotOrder', v => { applyOrder(v); emit(); });   // orden de los botones de los switches
   db.watch('draft', v => {   // no pisar con datos remotos lo que se está editando y aún no se ha guardado
     const n = fixGraphics(v, true);
     for (const id in pending) if (pending[id] && state.draft[id]) n[id] = state.draft[id];
@@ -127,6 +128,11 @@ export function addSlot(name) {
   const id = uid(), rec = { name, ts: Date.now() };
   state.slots[id] = rec; setCustomSlots(state.slots); state.draft[id] = newGraphic(id); emit();
   db.set(`slots/${id}`, rec); db.set(`draft/${id}`, state.draft[id]); return id;
+}
+export function moveSlot(id, to) {   // cambia la posición de un gráfico en los switches y en «Editando»
+  const ids = Object.keys(SLOTS), from = ids.indexOf(id); if (from < 0) return;
+  to = Math.max(0, Math.min(ids.length - 1, to)); if (from === to) return;
+  ids.splice(from, 1); ids.splice(to, 0, id); applyOrder(ids); emit(); return db.set('slotOrder', ids);
 }
 export function renameSlot(id, name) {
   if (!state.slots[id]) return; state.slots[id].name = name; setCustomSlots(state.slots); emit(); return db.set(`slots/${id}/name`, name);

@@ -57,3 +57,9 @@ Sin `databaseURL` funciona en modo local (mismo navegador), solo para pruebas.
 ## Versión 8
 - **Quitar la selección**: clic en un espacio vacío del editor (o en el vacío de la lista de Elementos, o tecla Esc) deja todo sin seleccionar. Mayús + clic en vacío no la quita.
 - **Elementos en cuadritos**: la lista pasa a cuadritos pequeños en varias columnas (cada uno con su tipo y nombre); los grupos van dentro de un recuadro punteado. Ya no hay que bajar para elegir un elemento.
+
+## Versión 9
+- **Orden de los switches**: arrastra un botón sobre otro, o usa «Antes» / «Después» en la lista de gráficos (dentro de «Abrir switches»). El orden se guarda en `/slotOrder` y también se aplica a «Editando».
+- **Cintilla en Diseño**: al seleccionar una cintilla en el editor ahora aparecen sus noticias (texto), junto con movimiento, tipografía, colores, separador y etiqueta.
+- **Tarjetas como cuadros**: las propiedades se acomodan en cuadros que se reparten el ancho disponible en vez de una columna larga.
+- **Bordes completos**: el borde de selección y el cuadro de tamaño ya no se cortan cuando el elemento toca el límite del escenario en el editor.
