@@ -27,6 +27,7 @@ const curEl = () => { const g = draftOf(); return g && byId(g, S().id); };
 const tickerOf = g => { if (!g) return null; const t = elsOf(g).filter(e => e.type === 'ticker'); return t.find(e => e.id === S().id) || t[0] || null; };
 const edit = (elId, fn) => store.mutate(sel, g => { const e = g.elements.find(x => x.id === elId); if (e) fn(e, g); });
 
+function deselect() { const s = S(); s.id = null; s.multi = new Set(); s.grp = null; s.none = true; render(store.get()); }   // quita la selección (clic en un espacio vacío)
 function selectOne(id) { const s = S(); s.id = id; s.multi = new Set(id ? [id] : []); s.grp = null; render(store.get()); }
 function selectGroup(gid) {
   const s = S(), m = elsOf(draftOf()).filter(e => e.group === gid);
@@ -42,7 +43,8 @@ function fixSel(g) {   // mantiene la selección válida si cambian o desaparece
   s.multi = new Set([...s.multi].filter(i => ids.has(i)));
   if (s.grp && !elsOf(g).some(e => e.group === s.grp)) s.grp = null;
   if (!ids.has(s.id)) s.id = null;
-  if (!s.id) { const f = elsOf(g).find(e => e.type === 'text') || elsOf(g)[0]; if (f) { s.id = f.id; s.grp = null; s.multi = new Set([f.id]); } }
+  if (s.id) s.none = false;
+  if (!s.id && !s.none) { const f = elsOf(g).find(e => e.type === 'text') || elsOf(g)[0]; if (f) { s.id = f.id; s.grp = null; s.multi = new Set([f.id]); } }
   if (!s.multi.size && s.id) s.multi.add(s.id);
 }
 function target() {   // elementos sobre los que actúan mover, escalar y alinear
@@ -284,10 +286,10 @@ function renderList(g) {
     Object.entries(groups).map(([k, v]) => k + v.name + v.locked).join()].join('|');
   if (box.dataset.k === key) return; box.dataset.k = key; box.innerHTML = '';
   const rev = els.slice().reverse(), done = new Set();
-  const row = (e, child) => {
+  const row = (e, child, into) => {
     const r = mk$('div', 'erow' + (child ? ' child' : '') + (s.multi.has(e.id) ? (s.grp ? ' in' : ' on') : '') + (e.on === false ? ' off' : ''));
     r.append(mk$('span', 'etype', TYPE[e.type] || ''), mk$('span', 'ename', e.name || e.type)); if (e.locked) r.append(mk$('span', 'etag', 'Bloqueado'));
-    r.onclick = ev => { if (ev.shiftKey || ev.ctrlKey || ev.metaKey) toggleMulti(e.id); else selectOne(e.id); }; box.append(r);
+    r.onclick = ev => { if (ev.shiftKey || ev.ctrlKey || ev.metaKey) toggleMulti(e.id); else selectOne(e.id); }; into.append(r);
   };
   rev.forEach(e => {
     if (e.group && groups[e.group]) {
@@ -295,10 +297,11 @@ function renderList(g) {
       const m = rev.filter(x => x.group === e.group), meta = groups[e.group];
       const h = mk$('div', 'erow grp' + (s.grp === e.group ? ' on' : ''));
       h.append(mk$('span', 'etype', 'Grupo'), mk$('span', 'ename', `${meta.name || 'Grupo'} (${m.length})`)); if (meta.locked) h.append(mk$('span', 'etag', 'Bloqueado'));
-      h.onclick = () => selectGroup(e.group); box.append(h); m.forEach(x => row(x, true));
-    } else row(e, false);
+      const wrap = mk$('div', 'egrp'); h.onclick = () => selectGroup(e.group); wrap.append(h); m.forEach(x => row(x, true, wrap)); box.append(wrap);
+    } else row(e, false, box);
   });
 }
+$('elList').onclick = ev => { if (ev.target === $('elList')) deselect(); };   // clic en el espacio vacío de la lista
 const addEl = e => { store.mutate(sel, g => g.elements.push(e)); selectOne(e.id); };
 const ADDERS = { text: newText, logo: newLogo, image: newImage, shape: newShape, ticker: newTicker };
 function addAt(kind, pt) {   // añade un elemento; con pt (clic derecho) queda centrado en ese punto
@@ -598,8 +601,9 @@ ovl.addEventListener('pointermove', ev => {
 ovl.addEventListener('pointerup', () => { drag = null; });
 ed.el.addEventListener('pointerdown', ev => {   // clic en el editor selecciona lo que hay debajo
   if (tab !== 'design' || ev.button !== 0 || ev.target.closest('.ovl')) return;
-  const h = hitAt(ev); if (!h) return;
-  pickHit(h, ev.shiftKey || ev.ctrlKey || ev.metaKey);
+  const h = hitAt(ev), add = ev.shiftKey || ev.ctrlKey || ev.metaKey;
+  if (!h) { if (!add) deselect(); return; }   // clic en un espacio vacío: se quita la selección
+  pickHit(h, add);
 });
 ed.el.addEventListener('dblclick', ev => { if (tab !== 'design') return; const h = hitAt(ev); if (!h) return; if (h.slot !== sel) selectSlot(h.slot, true); selectOne(h.e.id); });   // doble clic: elemento suelto dentro de un grupo
 ed.el.addEventListener('pointermove', ev => {
@@ -744,7 +748,7 @@ ed.el.addEventListener('contextmenu', ev => {
 });
 addEventListener('pointerdown', ev => { if (!ev.target.closest('.ctx')) hideCtx(); }, true);
 addEventListener('keydown', ev => {
-  if (ev.key === 'Escape') { hideCtx(); return; }
+  if (ev.key === 'Escape') { const open = !ctx.hidden; hideCtx(); if (!open && tab === 'design' && !/INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '')) deselect(); return; }
   if (tab !== 'design' || !(ev.ctrlKey || ev.metaKey) || /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '')) return;
   const k = ev.key.toLowerCase();
   if (k === 'z' && !ev.shiftKey) { ev.preventDefault(); doUndo(); }

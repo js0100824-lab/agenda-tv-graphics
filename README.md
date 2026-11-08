@@ -53,3 +53,7 @@ Sin `databaseURL` funciona en modo local (mismo navegador), solo para pruebas.
 - **Menú del clic derecho**: Copiar, Pegar, Eliminar y **Añadir**. Al pasar o tocar «Añadir» se abre otro menú al lado (como en Windows) con Texto, Logotipo, Imagen, Forma y Cintilla; el elemento nuevo aparece donde hiciste clic.
 - **Se quitó la fila «Copiar y pegar»** de abajo (siguen el menú del clic derecho y Ctrl + C / Ctrl + V).
 - **Varios gráficos abiertos a la vez**: en «Editando» (pestaña Diseño), tocar otro gráfico lo abre junto a los que ya estaban; se ven todos en el editor y puedes seleccionar y mover elementos de cualquiera (el que tocas pasa a ser el activo, en azul fuerte). Tocar el activo lo cierra.
+
+## Versión 8
+- **Quitar la selección**: clic en un espacio vacío del editor (o en el vacío de la lista de Elementos, o tecla Esc) deja todo sin seleccionar. Mayús + clic en vacío no la quita.
+- **Elementos en cuadritos**: la lista pasa a cuadritos pequeños en varias columnas (cada uno con su tipo y nombre); los grupos van dentro de un recuadro punteado. Ya no hay que bajar para elegir un elemento.

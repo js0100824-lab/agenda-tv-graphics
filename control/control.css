@@ -173,3 +173,11 @@ main.dsg .editbar{position:sticky;top:0;z-index:30;background:#111418;padding:6p
   .dtool{gap:10px 14px}
   .optool{flex-wrap:wrap}
 }
+
+/* ---- Elementos en cuadritos pequeños ---- */
+.dright .elist{flex-direction:row;flex-wrap:wrap;align-items:flex-start;gap:6px;max-height:none;overflow:visible}
+.elist .erow{flex-direction:column;align-items:flex-start;gap:1px;padding:5px 10px;min-width:84px;max-width:170px}
+.elist .erow.child{margin-left:0}
+.elist .ename{flex:none;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.elist .etype{min-width:0;font-size:9px}
+.egrp{display:flex;flex-wrap:wrap;gap:6px;padding:6px;border:1px dashed #f59e0b;border-radius:6px}
