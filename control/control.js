@@ -567,6 +567,9 @@ function drawOvl() {
   Object.assign(ovl.style, { display: 'block', left: b.x + 'px', top: b.y + 'px', width: b.w + 'px', height: b.h + 'px' });
   lbl.textContent = (lk ? 'BLOQUEADO · ' : '') + (t.group ? 'GRUPO: ' + ((grpOf(g)[t.group] || {}).name || '') : multi ? t.els.length + ' ELEMENTOS' : (t.els[0].name || t.els[0].type));
   lbl.style.top = b.y < 70 ? 'calc(var(--s, 1.6) * 6px)' : 'calc(var(--s, 1.6) * -26px)'; lbl.style.left = '6px'; hd.style.display = lk ? 'none' : 'block';
+  const ox = b.x + b.w > 1920, oy = b.y + b.h > 1080;   // si el elemento se sale del escenario, el tirador se queda en la esquina visible
+  if (ox || oy) Object.assign(hd.style, { right: 'auto', bottom: 'auto', left: `calc(${Math.min(b.x + b.w, 1920) - b.x}px - var(--s, 1.6) * 26px)`, top: `calc(${Math.min(b.y + b.h, 1080) - b.y}px - var(--s, 1.6) * 26px)` });
+  else Object.assign(hd.style, { right: '', bottom: '', left: '', top: '' });
   if (multi) t.els.forEach((e, i) => outline(i, e));
 }
 new ResizeObserver(() => drawOvl()).observe($('mEd'));

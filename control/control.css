@@ -183,7 +183,10 @@ main.dsg .editbar{position:sticky;top:0;z-index:30;background:#111418;padding:6p
 .egrp{display:flex;flex-wrap:wrap;gap:6px;padding:6px;border:1px dashed #f59e0b;border-radius:6px}
 
 /* ---- Editor completo: los bordes y tiradores no se cortan en los límites del escenario ---- */
-.mon.ed,.mon.ed .stage{overflow:visible}
+.mon.ed{overflow:visible}
+/* el contenido se recorta al escenario; solo queda un margen pequeño (alrededor) para ver completos el borde y el tirador */
+.mon.ed .stage{overflow:visible;clip-path:inset(calc(var(--s,3)*-30px) calc(var(--s,3)*-20px) calc(var(--s,3)*-20px) calc(var(--s,3)*-20px))}
+.mon.ed .gfx{overflow:hidden}
 .edwrap{padding:28px 20px 14px}
 .mon.ed{width:min(100%,70vh)}
 .dstick{padding-top:0}

@@ -63,3 +63,7 @@ Sin `databaseURL` funciona en modo local (mismo navegador), solo para pruebas.
 - **Cintilla en Diseño**: al seleccionar una cintilla en el editor ahora aparecen sus noticias (texto), junto con movimiento, tipografía, colores, separador y etiqueta.
 - **Tarjetas como cuadros**: las propiedades se acomodan en cuadros que se reparten el ancho disponible en vez de una columna larga.
 - **Bordes completos**: el borde de selección y el cuadro de tamaño ya no se cortan cuando el elemento toca el límite del escenario en el editor.
+
+## Versión 10
+- **Corregido**: un elemento más grande que el escenario ya no se pinta encima de los botones y tarjetas ni tapa los clics. El editor recorta el contenido al escenario y deja solo un margen pequeño alrededor para ver completos el borde y el tirador.
+- Si un elemento se sale del escenario, el tirador de tamaño se queda en la esquina visible, así siempre se puede reducir.
