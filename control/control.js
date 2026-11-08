@@ -560,13 +560,14 @@ function outline(i, r) {
 }
 function drawOvl() {
   ed.el.style.setProperty('--s', (1 / ed.scale()).toFixed(3));   // bordes, etiqueta y tirador conservan un tamaño cómodo en pantalla (también en teléfono)
-  const g = draftOf(), t = target(); pool.forEach(d => d.style.display = 'none');
+  const g = draftOf(), t = target(); pool.forEach(d => d.style.display = 'none'); ed.el.classList.remove('tight');
   if (tab !== 'design' || !g || !t.els.length) { ovl.style.display = 'none'; hov.style.display = 'none'; return; }
   const b = bb(t.els), lk = isLocked(g, t), multi = t.els.length > 1;
   ovl.className = 'ovl' + (t.group ? ' grp' : multi ? ' multi' : '') + (lk ? ' lock' : '');
   Object.assign(ovl.style, { display: 'block', left: b.x + 'px', top: b.y + 'px', width: b.w + 'px', height: b.h + 'px' });
   lbl.textContent = (lk ? 'BLOQUEADO · ' : '') + (t.group ? 'GRUPO: ' + ((grpOf(g)[t.group] || {}).name || '') : multi ? t.els.length + ' ELEMENTOS' : (t.els[0].name || t.els[0].type));
-  lbl.style.top = b.y < 70 ? 'calc(var(--s, 1.6) * 6px)' : 'calc(var(--s, 1.6) * -26px)'; lbl.style.left = '6px'; hd.style.display = lk ? 'none' : 'block';
+  ed.el.classList.toggle('tight', b.x < 0 || b.y < 0 || b.x + b.w > 1920 || b.y + b.h > 1080);   // si se sale del escenario, el borde se recorta justo en el límite
+  lbl.style.top = b.y < 70 ? `calc(${Math.max(0, -b.y)}px + var(--s, 1.6) * 6px)` : 'calc(var(--s, 1.6) * -26px)'; lbl.style.left = (Math.max(0, -b.x) + 6) + 'px'; hd.style.display = lk ? 'none' : 'block';
   const ox = b.x + b.w > 1920, oy = b.y + b.h > 1080;   // si el elemento se sale del escenario, el tirador se queda en la esquina visible
   if (ox || oy) Object.assign(hd.style, { right: 'auto', bottom: 'auto', left: `calc(${Math.min(b.x + b.w, 1920) - b.x}px - var(--s, 1.6) * 26px)`, top: `calc(${Math.min(b.y + b.h, 1080) - b.y}px - var(--s, 1.6) * 26px)` });
   else Object.assign(hd.style, { right: '', bottom: '', left: '', top: '' });

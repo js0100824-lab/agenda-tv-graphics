@@ -202,3 +202,5 @@ main.dsg .editbar{position:sticky;top:0;z-index:30;background:#111418;padding:6p
 .sbtn.drag{opacity:.4}.sbtn.over{outline:2px dashed #38bdf8;outline-offset:2px}
 .swmgr button:disabled{opacity:.4;cursor:not-allowed}
 .swmgr .hint{margin:0 0 4px}
+
+.mon.ed .stage.tight{clip-path:inset(0)}
