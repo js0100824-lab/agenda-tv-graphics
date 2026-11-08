@@ -50,7 +50,7 @@ export const newTicker = () => K(uid(), 'Cintilla', 0, 980, 1920, 100);
 export const TEMPLATES = {};
 const def = (key, name, desc, anim, elements) => { TEMPLATES[key] = { key, name, desc, anim, elements }; };
 
-def('blank', 'En blanco', 'Sin ningún elemento: parte de cero y crea tu propio diseño', { in: 'fade', duration: 600 }, []);
+def('blank', 'En blanco', 'Crea un gráfico nuevo y vacío; no toca los demás', { in: 'fade', duration: 600 }, []);
 
 def('logo_titulo', 'Logo + título', 'Panel azul institucional con logotipo a la izquierda', { in: 'left', duration: 700 }, [
   S('panel', 'Panel', 80, 830, 1760, 150, '#0b1f4d', { opacity: .96 }),

@@ -80,7 +80,6 @@ function setTab(t) {
   tab = t;
   document.querySelectorAll('#nav a').forEach(x => x.classList.toggle('on', x.dataset.tab === t));
   document.querySelectorAll('.tab').forEach(x => x.hidden = x.id !== 'tab-' + t);
-  document.body.classList.toggle('sw', t === 'sw');
   if (t !== 'design') closeBig();
   $('bigOpen').hidden = t !== 'design';
   if (t === 'design' && draftOf() && !draftOf().visible) store.mutate(sel, () => {});
@@ -128,9 +127,17 @@ function buildAirpad(s) {
 }
 $('slotAdd').onclick = () => {
   const name = (prompt('Nombre del nuevo gráfico (por ejemplo: Marcador, Reloj, Logo):') || '').trim(); if (!name) return;
-  selectSlot(store.addSlot(name)); setTab('tpl');   // empieza en blanco: elige una plantilla o diseña desde cero
+  selectSlot(store.addSlot(name));   // nuevo gráfico en blanco: aparece en los switches; se diseña en Diseño o Plantillas
 };
-$('tBlank').onclick = () => useTemplate(TEMPLATES.blank);
+let swOpen = false;
+$('swToggle').onclick = () => {
+  swOpen = !swOpen; $('opMain').hidden = swOpen; $('swPanel').hidden = !swOpen; $('swToggle').textContent = swOpen ? 'Cerrar switches' : 'Abrir switches';
+};
+function newBlankGraphic() {   // crea OTRO gráfico vacío; el gráfico seleccionado no se toca
+  const name = (prompt('Nombre del nuevo gráfico en blanco:', 'Gráfico ' + (Object.keys(SLOTS).length + 1)) || '').trim(); if (!name) return null;
+  const id = store.addSlot(name); selectSlot(id); store.preview(id); return id;
+}
+$('tBlank').onclick = newBlankGraphic;
 function buildLive(s) {
   const box = $('liveBar'), tk = tickerOf(s.draft[sel]);
   if (!tk) { box.hidden = true; return; }
@@ -409,14 +416,30 @@ const SECTIONS = {
 const grid = (specs, id) => { const d = mk$('div', 'gx'); specs.forEach(s => d.append(mk(s, id))); return d; };
 const card = (title, body) => { const c = mk$('div', 'dcard'); c.append(mk$('h3', '', title), body); return c; };
 
-// Las noticias se pegan en un solo cuadro; se separan por Enter, | o • (sin separadores = un solo texto continuo)
-const parseNews = raw => String(raw || '').split(/\r?\n|\||•|●|◆|■|★|\/\//).map(x => x.trim()).filter(Boolean);
+// Las noticias se pegan en un solo cuadro. Se separan por Enter, | o •; en modo automático también al final de cada frase.
+const ABBR = new Set(['ee', 'uu', 'sr', 'sra', 'srta', 'dr', 'dra', 'lic', 'ing', 'arq', 'prof', 'av', 'no', 'núm', 'num', 'etc', 'pág', 'tel', 'gral', 'cnel', 'art', 'ud', 'uds']);
+function sentences(text) {
+  const out = [], re = /([.!?]+)\s+(?=[A-ZÁÉÍÓÚÜÑ0-9¿¡"«“(])/g; let start = 0, m;
+  while ((m = re.exec(text))) {
+    const w = (text.slice(start, m.index).match(/(\S+)$/) || [''])[0];
+    if (m[1] === '.' && (/^[A-ZÁÉÍÓÚÜÑ]$/.test(w) || ABBR.has(w.toLowerCase().replace(/\./g, '')))) continue;   // iniciales y abreviaturas
+    out.push(text.slice(start, m.index + m[1].length)); start = m.index + m[0].length;
+  }
+  out.push(text.slice(start)); return out;
+}
+const parseNews = (raw, mode = 'auto') => {
+  const base = String(raw || '').split(/\r?\n|\||•|●|◆|■|★|\/\//).map(x => x.trim()).filter(Boolean);
+  return mode === 'lines' ? base : base.flatMap(sentences).map(x => x.trim()).filter(Boolean);
+};
 function buildNews(e) {
-  const w = mk$('div'), t = mk$('textarea'), n = mk$('p', 'hint');
-  t.rows = 7; t.dataset.raw = '1'; t.placeholder = 'Pega aquí el texto de la cintilla, con todas las noticias seguidas…';
-  t.oninput = () => edit(e.id, x => { x.raw = t.value; x.items = parseNews(t.value); });
-  n.dataset.cnt = '1';
-  w.append(t, n, mk$('p', 'hint', 'Pega todo el texto de una vez. Para separar noticias usa Enter, | o •: entre una y otra se coloca el separador elegido. Si no hay separadores, se muestra como un solo texto continuo.'));
+  const w = mk$('div'), t = mk$('textarea'), sp = mk$('select'), n = mk$('p', 'hint'), list = mk$('div', 'nlist');
+  t.rows = 6; t.dataset.raw = '1'; t.placeholder = 'Pega aquí el texto de la cintilla, con todas las noticias seguidas…';
+  const set = (x, raw, mode) => { x.raw = raw; x.split = mode; x.items = parseNews(raw, mode); };
+  t.oninput = () => edit(e.id, x => set(x, t.value, x.split || 'auto'));
+  [['auto', 'Automático: Enter, | , • y fin de frase'], ['lines', 'Solo con Enter, | o •']].forEach(([v, l]) => { const o = mk$('option', '', l); o.value = v; sp.append(o); });
+  sp.dataset.split = '1'; sp.onchange = () => edit(e.id, x => set(x, x.raw ?? arr(x.items).join('\n'), sp.value));
+  n.dataset.cnt = '1'; list.dataset.list = '1';
+  w.append(t, mk$('label', '', 'Cómo separar las noticias'), sp, n, list);
   return w;
 }
 function buildActions(e) {
@@ -450,6 +473,11 @@ function renderInsp(box, e, kind) {
     if (t === 'check') i.checked = !!v; else i.value = v ?? '';
   });
   box.querySelectorAll('[data-raw]').forEach(t => { if (document.activeElement !== t) t.value = e.raw ?? arr(e.items).join('\n'); });
+  box.querySelectorAll('[data-split]').forEach(i => { if (document.activeElement !== i) i.value = e.split || 'auto'; });
+  box.querySelectorAll('[data-list]').forEach(d => {   // lista de noticias detectadas, para ver dónde termina cada una
+    const items = arr(e.items), k = items.join('\u0001'); if (d.dataset.k === k) return; d.dataset.k = k; d.innerHTML = '';
+    items.forEach((t, i) => { const r = mk$('div', 'nitem'); r.append(mk$('b', '', String(i + 1)), mk$('span', '', t)); d.append(r); });
+  });
   box.querySelectorAll('[data-cnt]').forEach(n => { const c = arr(e.items).length; n.textContent = c === 1 ? '1 noticia detectada' : `${c} noticias detectadas`; });
 }
 function groupGeo(p, v) {   // X / Y / Ancho / Alto de un grupo o selección múltiple (el tamaño mantiene proporciones)
@@ -593,7 +621,7 @@ function renderSaved() {
 // ---------- Plantillas ----------
 let tplKey = null;
 function useTemplate(t) {
-  if (t.key === 'blank' && elsOf(draftOf()).length && !confirm('Se quitarán todos los elementos de este gráfico para empezar en blanco. ¿Continuar?')) return;
+  if (t.key === 'blank') { if (newBlankGraphic() && tab !== 'design') setTab('design'); return; }
   store.setGraphic(sel, instantiate(t, draftOf())); const s = S(); s.id = null; s.grp = null; s.multi = new Set(); $('fields').dataset.k = ''; render(store.get());
 }
 function addCard(grid, t, del) {

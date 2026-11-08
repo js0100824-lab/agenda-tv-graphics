@@ -57,21 +57,21 @@ button{font:inherit}
 .seg{display:flex;flex-wrap:wrap;gap:6px}
 .segb{padding:7px 14px;background:#1a2028;border:1px solid #2a3340;border-radius:4px;color:#cfd8e3;cursor:pointer;font-weight:600}
 .segb.on{background:#0b1f4d;border-color:#1565ff;color:#fff}
-body.sw .monitors,body.sw #editbar,body.sw #liveBar{display:none!important}
 
-/* ---- Switches ---- */
-.swhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.swhead h2{margin:0;font-size:14px;letter-spacing:.16em}
-.swhead button,.swmgr button{padding:8px 14px;border:0;border-radius:3px;background:#2a3340;color:#fff;cursor:pointer;font-weight:600}
-.swblock{background:#0b0d10;border:1px solid #232a33;border-radius:8px;padding:14px;margin-bottom:12px}
-.swlab{font-size:12px;font-weight:800;letter-spacing:.22em;margin-bottom:10px}.swlab.prog{color:#ff6b6b}.swlab.prev{color:#4ade80}
-.swrow{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.sbtn{min-height:110px;border:0;border-radius:8px;background:linear-gradient(#f4f4f6,#cfd0d6);color:#16181d;font:800 20px 'Segoe UI',Arial,sans-serif;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;box-shadow:0 4px 0 #8b8d96,0 6px 10px rgba(0,0,0,.5);padding:8px;word-break:break-word}
-.sbtn:active{transform:translateY(3px);box-shadow:0 1px 0 #8b8d96}
-.sbtn.prog.on{background:linear-gradient(#ff5a64,#d3202c);color:#fff;box-shadow:0 4px 0 #7d0f17,0 0 22px rgba(255,60,70,.7)}
-.sbtn.prev.on{background:linear-gradient(#4ade80,#18a34a);color:#04210d;box-shadow:0 4px 0 #0d5c2e,0 0 22px rgba(74,222,128,.6)}
-.sbtn.sel{outline:3px solid #38bdf8;outline-offset:3px}
+/* ---- Switches (dentro de Operación, bajo los monitores) ---- */
+.optool{display:flex;gap:8px;margin-bottom:12px}
+.optool button,.swmgr button{padding:8px 14px;border:0;border-radius:3px;background:#2a3340;color:#fff;cursor:pointer;font-weight:600}
+.swblock{display:flex;align-items:center;gap:14px;background:#0b0d10;border:1px solid #232a33;border-radius:8px;padding:8px 12px;margin-bottom:8px}
+.swlab{flex:none;width:84px;font-size:11px;font-weight:800;letter-spacing:.2em}.swlab.prog{color:#ff6b6b}.swlab.prev{color:#4ade80}
+.swrow{flex:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.sbtn{min-height:52px;border:0;border-radius:6px;background:linear-gradient(#f4f4f6,#cfd0d6);color:#16181d;font:800 14px 'Segoe UI',Arial,sans-serif;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;box-shadow:0 3px 0 #8b8d96,0 4px 8px rgba(0,0,0,.5);padding:6px;word-break:break-word}
+.sbtn:active{transform:translateY(2px);box-shadow:0 1px 0 #8b8d96}
+.sbtn.prog.on{background:linear-gradient(#ff5a64,#d3202c);color:#fff;box-shadow:0 3px 0 #7d0f17,0 0 16px rgba(255,60,70,.7)}
+.sbtn.prev.on{background:linear-gradient(#4ade80,#18a34a);color:#04210d;box-shadow:0 3px 0 #0d5c2e,0 0 16px rgba(74,222,128,.6)}
+.sbtn.sel{outline:2px solid #38bdf8;outline-offset:2px}
 .swmgr{display:flex;flex-direction:column;gap:6px;margin:4px 0 10px}
 .swmgr .mrow{display:flex;align-items:center;gap:8px;background:#1a2028;border:1px solid #2a3340;border-radius:4px;padding:6px 10px}.swmgr .mrow span{flex:1}
+.nlist{margin-top:6px}.nitem{display:flex;gap:10px;padding:5px 10px;margin-top:4px;background:#1a2028;border-left:3px solid #dc2626;font-size:12px}.nitem b{color:#9aa7b8;min-width:16px}
 
 /* ---- Selección en PREVIEW ---- */
 .ovl .lbl{position:absolute;left:6px;top:-54px;padding:4px 14px;background:#38bdf8;color:#04121f;font:700 30px 'Segoe UI',Arial,sans-serif;white-space:nowrap;border-radius:4px;pointer-events:none}

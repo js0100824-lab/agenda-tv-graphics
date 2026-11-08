@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="../assets/gfx.css"><link rel="stylesheet" href="control.css"></head>
 <body>
 <aside><h1>AGENDA TV<small>GRAPHICS</small></h1>
-  <nav id="nav"><a data-tab="op" class="on">Operación</a><a data-tab="sw">Switches</a><a data-tab="design">Diseño</a><a data-tab="anim">Animaciones</a><a data-tab="ticker">Cintilla</a><a data-tab="saved">Titulares guardados</a><a data-tab="tpl">Plantillas</a></nav>
+  <nav id="nav"><a data-tab="op" class="on">Operación</a><a data-tab="design">Diseño</a><a data-tab="anim">Animaciones</a><a data-tab="ticker">Cintilla</a><a data-tab="saved">Titulares guardados</a><a data-tab="tpl">Plantillas</a></nav>
   <div class="foot"><div id="status" class="status">…</div><label>URL para OBS</label><input id="obsurl" readonly></div></aside>
 <main>
   <section class="monitors">
@@ -15,21 +15,22 @@
   <section class="livebar" id="liveBar" hidden></section>
 
   <section class="panel tab" id="tab-op">
-    <div class="cols"><div id="fields"></div>
-      <div><h3>Animación</h3><div id="animQuick"></div>
-      <div class="pvbar"><button data-pv="in" class="go">Entrada</button><button data-pv="out">Salida</button><button data-pv="both">Ambas</button><button data-pv="loop">Repetir</button></div>
-      <p class="hint">Las pruebas solo se ven en PREVIEW; no afectan a lo que está en aire. Más opciones en la pestaña Animaciones.</p></div></div>
-    <div class="btns"><button id="bPrev">Previsualizar</button>
-      <button id="bUpd" class="go">Actualizar en aire</button><button id="bClr">Limpiar</button></div>
-    <p class="hint">Para sacar un gráfico al aire o quitarlo usa la pestaña Switches.</p>
-  </section>
-
-  <section class="panel tab" id="tab-sw" hidden>
-    <div class="swhead"><h2>MESA DE SWITCHES</h2><button id="slotAdd" class="go">Añadir gráfico</button></div>
-    <div class="swblock"><div class="swlab prog">PROGRAMA</div><div class="swrow" id="swProg"></div></div>
-    <div class="swblock"><div class="swlab prev">PREVIEW</div><div class="swrow" id="swPrev"></div></div>
-    <div id="swMgr"></div>
-    <p class="hint">PROGRAMA: un clic saca el gráfico al aire (rojo) y otro clic lo oculta. PREVIEW: enciende o apaga el gráfico en la vista previa (verde) y lo deja seleccionado para editarlo.</p>
+    <div class="optool"><button id="swToggle" class="go">Abrir switches</button><button id="slotAdd">Añadir gráfico</button></div>
+    <div id="opMain">
+      <div class="cols"><div id="fields"></div>
+        <div><h3>Animación</h3><div id="animQuick"></div>
+        <div class="pvbar"><button data-pv="in" class="go">Entrada</button><button data-pv="out">Salida</button><button data-pv="both">Ambas</button><button data-pv="loop">Repetir</button></div>
+        <p class="hint">Las pruebas solo se ven en PREVIEW; no afectan a lo que está en aire. Más opciones en la pestaña Animaciones.</p></div></div>
+      <div class="btns"><button id="bPrev">Previsualizar</button>
+        <button id="bUpd" class="go">Actualizar en aire</button><button id="bClr">Limpiar</button></div>
+      <p class="hint">Para sacar un gráfico al aire o quitarlo usa el botón «Abrir switches».</p>
+    </div>
+    <div id="swPanel" hidden>
+      <div class="swblock"><div class="swlab prog">PROGRAMA</div><div class="swrow" id="swProg"></div></div>
+      <div class="swblock"><div class="swlab prev">PREVIEW</div><div class="swrow" id="swPrev"></div></div>
+      <div id="swMgr"></div>
+      <p class="hint">PROGRAMA: un clic saca el gráfico al aire (rojo) y otro clic lo oculta. PREVIEW: enciende o apaga el gráfico en la vista previa (verde) y lo deja seleccionado para editarlo. Pulsa «Cerrar switches» para volver.</p>
+    </div>
   </section>
 
   <section class="panel tab" id="tab-design" hidden>

@@ -28,3 +28,8 @@ Sin `databaseURL` funciona en modo local (mismo navegador), solo para pruebas.
 - **Switches** (pestaña propia): fila PROGRAMA (rojo, al aire) y fila PREVIEW (verde), con el nombre de cada gráfico.
 - **Cintilla**: las noticias se pegan en un solo cuadro (separadas por Enter, | o •).
 - **Diseño** reorganizado en tarjetas; sin iconos ni emojis en la interfaz.
+
+## Última actualización
+- **Switches** dentro de Operación, bajo los monitores: botón «Abrir switches» / «Cerrar switches» y «Añadir gráfico».
+- **Empezar en blanco** crea un gráfico nuevo y vacío sin tocar el que estaba seleccionado.
+- **Cintilla**: separación automática de noticias (Enter, |, • y fin de frase) con lista de las noticias detectadas.
