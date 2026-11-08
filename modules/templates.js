@@ -59,7 +59,7 @@ export const newText   = () => T(uid(), 'Texto nuevo', '', 200, 400, 900, 120, '
 export const newImage  = () => I(uid(), 'Imagen', '', 100, 100, 300, 200);
 export const newLogo   = () => I(uid(), 'Logotipo', 'logo', 100, 100, 240, 160);
 export const newShape  = () => S(uid(), 'Forma', 200, 300, 400, 100, '#1565ff');
-export const newClock  = () => ({ id: uid(), type: 'clock', name: 'Reloj', role: 'clock', x: 1500, y: 40, w: 380, h: 110, fmt: 'hms', h12: false,
+export const newClock  = () => ({ id: uid(), type: 'clock', name: 'Reloj', role: 'clock', x: 1500, y: 40, w: 380, h: 110, fmt: 'hms', h12: true,
   font: 'Segoe UI', size: 64, minSize: 16, weight: 700, color: '#ffffff', bg: '#0b1f4d', align: 'center', valign: 'middle', padX: 24, lh: 1.1, autofit: true, on: true });
 export const newTicker = () => K(uid(), 'Cintilla', 0, 980, 1920, 100);
 
