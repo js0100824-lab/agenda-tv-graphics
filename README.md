@@ -46,3 +46,10 @@ Sin `databaseURL` funciona en modo local (mismo navegador), solo para pruebas.
 - **Se quitó la pestaña Animaciones**: todo está en Operación. Las opciones básicas siguen a la vista y las avanzadas (retardos, velocidad, por elemento) están en «Animación avanzada», plegada.
 - **Se quitó la barra duplicada** de grupos y alinear que estaba sobre el editor (siguen en el panel derecho).
 - **Teléfono**: menú superior con desplazamiento lateral, monitores lado a lado, columnas en una sola, botones y campos más grandes, y tirador y bordes de selección que se ven y se tocan bien aunque el editor sea pequeño. Mantener pulsado sobre un elemento abre el menú de copiar, pegar y eliminar.
+
+## Versión 7 (Diseño como antes, pero más cómodo)
+- **Todo vuelve abajo**: se quitó el panel pegado a la esquina derecha. Debajo del editor van Añadir, Historial y «Empezar en blanco», y más abajo Elementos, propiedades, Selección y grupos, Alinear, etc.
+- **Editor fijo**: al hacer scroll el editor (con sus botones) se queda arriba y solo se desplazan los apartados de abajo.
+- **Menú del clic derecho**: Copiar, Pegar, Eliminar y **Añadir**. Al pasar o tocar «Añadir» se abre otro menú al lado (como en Windows) con Texto, Logotipo, Imagen, Forma y Cintilla; el elemento nuevo aparece donde hiciste clic.
+- **Se quitó la fila «Copiar y pegar»** de abajo (siguen el menú del clic derecho y Ctrl + C / Ctrl + V).
+- **Varios gráficos abiertos a la vez**: en «Editando» (pestaña Diseño), tocar otro gráfico lo abre junto a los que ya estaban; se ven todos en el editor y puedes seleccionar y mover elementos de cualquiera (el que tocas pasa a ser el activo, en azul fuerte). Tocar el activo lo cierra.

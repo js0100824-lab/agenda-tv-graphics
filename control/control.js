@@ -1,7 +1,7 @@
 import * as store from '../modules/store.js';
 import * as db from '../modules/firebase.js';
 import { createStage } from '../modules/stage.js';
-import { SLOTS, TEMPLATES, TEMPLATE_LIST, FONTS, arr, uid, instantiate, newText, newImage, newLogo, newShape, newTicker } from '../modules/templates.js';
+import { SLOTS, TEMPLATES, TEMPLATE_LIST, FONTS, arr, uid, layerOf, instantiate, newText, newImage, newLogo, newShape, newTicker } from '../modules/templates.js';
 import { CATALOG, normAnim, outKey } from '../modules/animations.js';
 
 const $ = id => document.getElementById(id);
@@ -13,6 +13,7 @@ const mk$ = (tag, cls, text) => { const e = document.createElement(tag); if (cls
 const prev = createStage($('mPrev'), { placeholders: true }), prog = createStage($('mProg'));
 const ed = createStage($('mEd'), { placeholders: true, static: true });   // editor propio de la pestaña Diseño (independiente de PREVIEW y PROGRAMA)
 let sel = 'headline', tab = 'op', editingH = null, loopOn = false, animElId = null;
+let open = new Set(['headline']);   // gráficos abiertos juntos en el editor de Diseño; «sel» es el activo (el que muestran la lista y las propiedades)
 const STAGE = { x: 0, y: 0, w: 1920, h: 1080 };
 
 // ---------- Selección: un elemento, varios (Mayús + clic) o un grupo completo ----------
@@ -95,14 +96,24 @@ function toggleView(id) {
   if (id !== sel) selectSlot(id);
   if (d.visible) store.unpreview(id); else store.preview(id);
 }
-function selectSlot(id) {
+function selectSlot(id, add) {
   loopOn = false; syncLoopBtns(); prev.stopTest(sel); sel = id;
+  if (add && tab === 'design') open.add(id); else open = new Set([id]);
   ['fields', 'animQuick', 'animFull', 'animEl', 'insp'].forEach(i => { $(i).dataset.k = ''; }); render(store.get());
 }
 function buildEditbar() {
-  const box = $('editBtns'), ids = Object.keys(SLOTS), key = ids.map(id => id + SLOTS[id].name + (id === sel)).join('|');
+  const box = $('editBtns'), ids = Object.keys(SLOTS), multi = tab === 'design', key = ids.map(id => id + SLOTS[id].name + (id === sel) + (multi && open.has(id))).join('|');
+  $('edHint').hidden = !multi;
   if (box.dataset.k === key) return; box.dataset.k = key; box.innerHTML = '';
-  ids.forEach(id => { const b = mk$('button', 'segb' + (id === sel ? ' on' : ''), SLOTS[id].name); b.onclick = () => selectSlot(id); box.append(b); });
+  ids.forEach(id => {
+    const b = mk$('button', 'segb' + (id === sel ? ' on' : multi && open.has(id) ? ' open' : ''), SLOTS[id].name);
+    b.onclick = () => {
+      if (tab !== 'design') { selectSlot(id); return; }
+      if (id === sel && open.size > 1) { open.delete(id); selectSlot([...open].pop(), true); return; }   // cerrar el activo: pasa al último que quedó abierto
+      selectSlot(id, true);   // abrir otro gráfico junto a los que ya están abiertos (o activar uno ya abierto)
+    };
+    box.append(b);
+  });
 }
 function buildAirpad(s) {
   const ids = Object.keys(SLOTS), live = id => !!(s.program[id] && s.program[id].visible), view = id => !!(s.draft[id] && s.draft[id].visible);
@@ -289,11 +300,14 @@ function renderList(g) {
   });
 }
 const addEl = e => { store.mutate(sel, g => g.elements.push(e)); selectOne(e.id); };
-$('addText').onclick = () => addEl(newText());
-$('addShape').onclick = () => addEl(newShape());
-$('addTicker').onclick = () => addEl(newTicker());
-$('addLogo').onclick = () => { const e = newLogo(); addEl(e); pickImage(r => applyImage(e.id, r, true)); };
-$('addImg').onclick = () => { const e = newImage(); addEl(e); pickImage(r => applyImage(e.id, r, true)); };
+const ADDERS = { text: newText, logo: newLogo, image: newImage, shape: newShape, ticker: newTicker };
+function addAt(kind, pt) {   // añade un elemento; con pt (clic derecho) queda centrado en ese punto
+  const e = ADDERS[kind]();
+  if (pt && kind !== 'ticker') { e.x = Math.round(Math.max(0, Math.min(1920 - e.w, pt.x - e.w / 2))); e.y = Math.round(Math.max(0, Math.min(1080 - e.h, pt.y - e.h / 2))); }
+  addEl(e); if (kind === 'logo' || kind === 'image') pickImage(r => applyImage(e.id, r, true));
+}
+$('addText').onclick = () => addAt('text'); $('addShape').onclick = () => addAt('shape'); $('addTicker').onclick = () => addAt('ticker');
+$('addLogo').onclick = () => addAt('logo'); $('addImg').onclick = () => addAt('image');
 $('tSave').onclick = () => {
   const name = $('tName').value.trim(), g = draftOf(); if (!name) { alert('Escribe un nombre para la plantilla.'); return; }
   store.saveTemplate({ name, desc: 'Plantilla personalizada', elements: clone(g.elements), groups: clone(g.groups || {}), anim: clone(g.anim) }); $('tName').value = '';
@@ -544,10 +558,20 @@ function drawOvl() {
   if (multi) t.els.forEach((e, i) => outline(i, e));
 }
 new ResizeObserver(() => drawOvl()).observe($('mEd'));
-function hitAt(ev) {   // elemento visible más alto bajo el puntero
-  const g = draftOf(); if (!g) return null;
-  const r = ed.el.getBoundingClientRect(), k = 1 / ed.scale(), px = (ev.clientX - r.left) * k, py = (ev.clientY - r.top) * k;
-  return elsOf(g).slice().reverse().find(e => e.on !== false && px >= e.x && px <= e.x + e.w && py >= e.y && py <= e.y + e.h) || null;
+function stagePt(ev) { const r = ed.el.getBoundingClientRect(), k = 1 / ed.scale(); return { x: (ev.clientX - r.left) * k, y: (ev.clientY - r.top) * k }; }
+function hitAt(ev) {   // elemento visible más alto bajo el puntero, entre todos los gráficos abiertos: { e, slot }
+  const { x: px, y: py } = stagePt(ev), d = store.get().draft;
+  const ids = [...open].filter(id => d[id]).sort((a, b) => layerOf(b) - layerOf(a));   // primero el gráfico que queda por encima
+  for (const id of ids) {
+    const e = elsOf(d[id]).slice().reverse().find(e => e.on !== false && px >= e.x && px <= e.x + e.w && py >= e.y && py <= e.y + e.h);
+    if (e) return { e, slot: id };
+  }
+  return null;
+}
+function pickHit(h, multi) {   // selecciona lo tocado; si es de otro gráfico abierto, ese pasa a ser el activo
+  const same = h.slot === sel; if (!same) selectSlot(h.slot, true);
+  if (multi && same) toggleMulti(h.e.id);
+  else if (h.e.group && grpOf(draftOf())[h.e.group]) selectGroup(h.e.group); else selectOne(h.e.id);
 }
 let drag = null;
 ovl.addEventListener('pointerdown', ev => {
@@ -575,14 +599,13 @@ ovl.addEventListener('pointerup', () => { drag = null; });
 ed.el.addEventListener('pointerdown', ev => {   // clic en el editor selecciona lo que hay debajo
   if (tab !== 'design' || ev.button !== 0 || ev.target.closest('.ovl')) return;
   const h = hitAt(ev); if (!h) return;
-  if (ev.shiftKey || ev.ctrlKey || ev.metaKey) toggleMulti(h.id);
-  else if (h.group && grpOf(draftOf())[h.group]) selectGroup(h.group); else selectOne(h.id);
+  pickHit(h, ev.shiftKey || ev.ctrlKey || ev.metaKey);
 });
-ed.el.addEventListener('dblclick', ev => { if (tab !== 'design') return; const h = hitAt(ev); if (h) selectOne(h.id); });   // doble clic: elemento suelto dentro de un grupo
+ed.el.addEventListener('dblclick', ev => { if (tab !== 'design') return; const h = hitAt(ev); if (!h) return; if (h.slot !== sel) selectSlot(h.slot, true); selectOne(h.e.id); });   // doble clic: elemento suelto dentro de un grupo
 ed.el.addEventListener('pointermove', ev => {
   if (tab !== 'design' || drag) { hov.style.display = 'none'; return; }
-  const h = hitAt(ev); if (!h || S().multi.has(h.id)) { hov.style.display = 'none'; return; }
-  Object.assign(hov.style, { display: 'block', left: h.x + 'px', top: h.y + 'px', width: h.w + 'px', height: h.h + 'px' });
+  const h = hitAt(ev); if (!h || (h.slot === sel && S().multi.has(h.e.id))) { hov.style.display = 'none'; return; }
+  const e = h.e; Object.assign(hov.style, { display: 'block', left: e.x + 'px', top: e.y + 'px', width: e.w + 'px', height: e.h + 'px' });
 });
 ed.el.addEventListener('pointerleave', () => { hov.style.display = 'none'; });
 addEventListener('keydown', ev => {   // flechas: mover 1 px (Mayús = 10 px) lo seleccionado
@@ -694,23 +717,30 @@ function deleteSel() {
   store.mutate(sel, g2 => { g2.elements = g2.elements.filter(x => !ids.has(x.id)); cleanGroups(g2); });
   const s = S(); s.id = null; s.grp = null; s.multi = new Set(); render(store.get());
 }
-$('edCopy').onclick = copySel; $('edPaste').onclick = pasteClip;
-function syncEditTools() {
-  $('edUndo').disabled = !store.canUndo(sel); $('edRedo').disabled = !store.canRedo(sel);
-  const t = target(); $('edCopy').disabled = !t.els.length; $('edPaste').disabled = !(clip && clip.els && clip.els.length);
-  $('clipInfo').textContent = clip && clip.els && clip.els.length ? `Copiado: ${clip.els.length === 1 ? (clip.els[0].name || clip.els[0].type) : clip.els.length + ' elementos'}` : '';
-}
+function syncEditTools() { $('edUndo').disabled = !store.canUndo(sel); $('edRedo').disabled = !store.canRedo(sel); }
 
-// Menú del clic derecho sobre el editor
-const ctx = mk$('div', 'ctx'); ctx.hidden = true; document.body.append(ctx);
-function hideCtx() { ctx.hidden = true; }
+// Menú del clic derecho sobre el editor: Copiar, Pegar, Eliminar y Añadir (con submenú al lado, como en Windows)
+const ctx = mk$('div', 'ctx'), sub = mk$('div', 'ctx sub'); ctx.hidden = sub.hidden = true; document.body.append(ctx, sub);
+function hideCtx() { ctx.hidden = true; sub.hidden = true; }
+const ADD_ITEMS = [['text', 'Texto'], ['logo', 'Logotipo'], ['image', 'Imagen'], ['shape', 'Forma'], ['ticker', 'Cintilla']];
+function openSub(btn, pt) {
+  sub.innerHTML = ''; sub.append(mk$('div', 'clab', 'En «' + SLOTS[sel].name + '»'));
+  ADD_ITEMS.forEach(([k, t]) => { const b = mk$('button', '', t); b.onclick = () => { hideCtx(); addAt(k, pt); }; sub.append(b); });
+  sub.hidden = false;
+  const r = btn.getBoundingClientRect(), w = sub.offsetWidth, h = sub.offsetHeight;
+  sub.style.left = (r.right + 2 + w > innerWidth - 4 ? Math.max(4, r.left - w - 2) : r.right + 2) + 'px';   // se abre a la derecha; si no cabe, a la izquierda
+  sub.style.top = Math.max(4, Math.min(r.top - 4, innerHeight - h - 8)) + 'px';
+}
 ed.el.addEventListener('contextmenu', ev => {
   ev.preventDefault(); if (tab !== 'design') return;
-  const h = hitAt(ev); if (h && !S().multi.has(h.id)) { if (h.group && grpOf(draftOf())[h.group]) selectGroup(h.group); else selectOne(h.id); }
-  const has = target().els.length > 0; ctx.innerHTML = '';
-  const item = (t, f, dis, cls) => { const b = mk$('button', cls || '', t); b.disabled = !!dis; b.onclick = () => { hideCtx(); f(); }; ctx.append(b); };
+  const h = hitAt(ev); if (h && !(h.slot === sel && S().multi.has(h.e.id))) pickHit(h, false);
+  const pt = stagePt(ev), has = target().els.length > 0; ctx.innerHTML = ''; sub.hidden = true;
+  const item = (t, f, dis, cls) => { const b = mk$('button', cls || '', t); b.disabled = !!dis; b.onclick = () => { hideCtx(); f(); }; b.onmouseenter = () => { sub.hidden = true; }; ctx.append(b); };
   item('Copiar', copySel, !has); item('Pegar', pasteClip, !(clip && clip.els && clip.els.length)); item('Eliminar', deleteSel, !has, 'danger');
-  ctx.hidden = false; ctx.style.left = Math.min(ev.clientX, innerWidth - 190) + 'px'; ctx.style.top = Math.min(ev.clientY, innerHeight - 130) + 'px';
+  ctx.append(mk$('div', 'csep'));
+  const add = mk$('button', 'hassub', 'Añadir'); add.onmouseenter = add.onclick = () => openSub(add, pt); ctx.append(add);
+  ctx.hidden = false;
+  ctx.style.left = Math.max(4, Math.min(ev.clientX, innerWidth - ctx.offsetWidth - 8)) + 'px'; ctx.style.top = Math.max(4, Math.min(ev.clientY, innerHeight - ctx.offsetHeight - 8)) + 'px';
 });
 addEventListener('pointerdown', ev => { if (!ev.target.closest('.ctx')) hideCtx(); }, true);
 addEventListener('keydown', ev => {
@@ -723,14 +753,21 @@ addEventListener('keydown', ev => {
   else if (k === 'v') { if (clip) { ev.preventDefault(); pasteClip(); } }
 });
 
+// Editor fijo arriba: alturas de la barra superior y de «Editando» para que el editor se quede pegado debajo
+const asideEl = document.querySelector('aside'), ebEl = $('editbar');
+function syncOffsets() { const r = document.documentElement.style; r.setProperty('--ah', asideEl.offsetHeight + 'px'); r.setProperty('--eb', ebEl.offsetHeight + 'px'); }
+new ResizeObserver(syncOffsets).observe(asideEl); new ResizeObserver(syncOffsets).observe(ebEl); syncOffsets();
+
 // ---------- Render general ----------
 function render(s) {
   if (!SLOTS[sel]) sel = 'headline';
+  open = new Set([...open].filter(id => SLOTS[id])); open.add(sel);
   prev.apply(s.draft); prog.apply(s.program); buildEditbar(); buildAirpad(s);
   $('monitors').classList.toggle('off', tab === 'design');   // en Diseño solo se ve el editor (los monitores siguen montados fuera de pantalla)
   const g = s.draft[sel]; if (!g) return;
   fixSel(g); buildLive(s);
-  ed.apply(tab === 'design' ? { [sel]: { ...g, visible: true } } : {});   // el editor siempre muestra lo que editas, esté el switch encendido o no
+  const show = {}; if (tab === 'design') open.forEach(id => { if (s.draft[id]) show[id] = { ...s.draft[id], visible: true }; });
+  ed.apply(show);   // el editor muestra todos los gráficos abiertos, estén o no sus switches encendidos
   if (tab === 'design') syncEditTools();
   if (tab === 'op') {
     syncContent(g); renderAnim($('animQuick'), g, false);

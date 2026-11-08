@@ -122,25 +122,24 @@ details.dcard[open] summary{margin-bottom:10px}
 .grid1{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
 .adds select{width:auto}
 
-/* ---- Diseño: la vista arriba, herramientas debajo, panel de propiedades a un lado ---- */
-.dtool{border-bottom:0;margin:12px 0 0;padding:0}
+/* ---- Diseño: editor fijo arriba, herramientas debajo y el resto de apartados debajo, desplazándose ---- */
+.dtool{border-bottom:0;margin:10px 0 0;padding:0}
 .edwrap{margin:0}
-.dright{display:flex;flex-direction:column;gap:12px;min-width:0}
+.dright{display:flex;flex-direction:column;gap:12px;min-width:0;padding:14px}
 .dright .elist{max-height:190px}
 details.adv{margin-top:14px;border-top:1px solid #232a33;padding-top:10px}
 details.adv summary{cursor:pointer;font-size:12px;letter-spacing:.1em;color:#9aa7b8;text-transform:uppercase}
-.editbar{flex-wrap:wrap}
-@media (min-width:1000px){
-  main.dsg{overflow:hidden}
-  #tab-design:not([hidden]){display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:16px;flex:1;min-height:0;padding:12px}
-  .dleft,.dright{min-height:0;overflow:auto}
-  .dright{padding-right:4px}
-}
-@media (max-width:999px){
-  #tab-design:not([hidden]){display:block}
-  .dright{margin-top:14px}
-  .mon.ed{width:100%}
-}
+.editbar{flex-wrap:wrap}.editbar .hint{margin:0}
+.segb.open{border-color:#38bdf8;color:#fff}
+#tab-design{padding:0}
+#tab-design:not([hidden]){display:block}
+.dstick{position:sticky;top:var(--eb,52px);z-index:20;background:#171b21;padding:10px 14px;border-bottom:1px solid #232a33;border-radius:4px 4px 0 0;box-shadow:0 8px 10px -8px rgba(0,0,0,.7)}
+main.dsg .editbar{position:sticky;top:0;z-index:30;background:#111418;padding:6px 0}
+.mon.ed{width:min(100%,78vh);margin:0 auto}
+.ctx .csep{height:1px;background:#232a33;margin:4px 2px}
+.ctx .hassub{display:flex;justify-content:space-between;align-items:center}
+.ctx .hassub::after{content:'';width:6px;height:6px;border-right:2px solid #9aa7b8;border-top:2px solid #9aa7b8;transform:rotate(45deg);margin-left:14px}
+.ctx .clab{padding:6px 12px 4px;font-size:11px;letter-spacing:.08em;color:#9aa7b8;text-transform:uppercase;white-space:nowrap}
 
 /* ---- Teléfono ---- */
 @media (max-width:820px){
@@ -151,7 +150,12 @@ details.adv summary{cursor:pointer;font-size:12px;letter-spacing:.1em;color:#9aa
   nav{order:3;flex:0 0 100%;flex-direction:row;overflow-x:auto;gap:6px;padding-bottom:2px;-webkit-overflow-scrolling:touch}
   nav a{flex:none;white-space:nowrap;padding:8px 12px}
   main{overflow:visible;padding:10px;gap:10px;min-width:0}
-  .panel{padding:10px}
+  .panel{padding:10px}#tab-design{padding:0}
+  .dstick{display:contents}
+  .edwrap{position:sticky;top:var(--ah,90px);z-index:20;background:#171b21;padding:8px 10px;border-radius:4px 4px 0 0;box-shadow:0 8px 10px -8px rgba(0,0,0,.7)}
+  .dtool{padding:12px 10px 0}.dright{padding:12px 10px}
+  main.dsg .editbar{position:static}
+  .mon.ed{width:100%}
   .monitors{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
   h2{font-size:10px}.pvh{height:22px}
   .cols,.cols3,.dcols,.grid2,.grid1{grid-template-columns:1fr}
