@@ -432,13 +432,32 @@ function setProp(id, p, v) {
     if (e.type === 'image' && e.lock !== false && ow && oh) { if (p === 'w') e.h = Math.max(1, Math.round(v * oh / ow)); if (p === 'h') e.w = Math.max(1, Math.round(v * ow / oh)); }
   });
 }
+// ---------- Gotero: copia un color de otro elemento ----------
+// Con el gotero del navegador (Chrome / Edge) se toma el color de cualquier punto de la pantalla; si no existe, se toca un elemento del editor.
+let pickCb = null; const toast = mk$('div', 'toast'); toast.hidden = true; document.body.append(toast);
+function endPick() { pickCb = null; toast.hidden = true; $('mEd').classList.remove('picking'); }
+async function pickColor(cb) {
+  if (window.EyeDropper) { try { cb((await new EyeDropper().open()).sRGBHex); } catch { /* cancelado con Esc */ } return; }
+  pickCb = cb; toast.textContent = 'Gotero: toca un elemento del editor para copiar su color (Esc cancela)'; toast.hidden = false; $('mEd').classList.add('picking');
+}
+const colorOf = e => {   // color principal de un elemento: forma → color; cintilla → fondo; texto, reloj e imagen → fondo (o el color del texto si no tiene fondo)
+  const v = e.type === 'shape' ? e.color : e.type === 'ticker' ? e.bg : (e.bg || (e.type === 'image' ? '' : e.color));
+  return /^#[0-9a-f]{6}$/i.test(v || '') ? v : null;
+};
+ed.el.addEventListener('pointerdown', ev => {   // en modo gotero el clic no selecciona: solo copia el color
+  if (!pickCb) return; ev.stopPropagation(); ev.preventDefault();
+  const h = hitAt(ev), c = h && colorOf(h.e); if (!c) { toast.textContent = 'Ese punto no tiene color. Toca otro elemento (Esc cancela)'; return; }
+  const cb = pickCb; endPick(); cb(c);
+}, true);
+addEventListener('keydown', ev => { if (ev.key === 'Escape' && pickCb) endPick(); });
+const dropper = apply => { const b = mk$('button', 'dropb', 'Gotero'); b.type = 'button'; b.title = 'Copiar un color de otro elemento'; b.onclick = () => pickColor(apply); return b; };
 function mk(spec, id) {
   const [p, label, type, opt] = spec, w = mk$('div', 'f' + (type === 'area' ? ' wide' : ''));
   if (type === 'check') { const l = mk$('label', 'chk'), i = mk$('input'); i.type = 'checkbox'; i.dataset.p = p; i.dataset.t = type; i.onchange = () => setProp(id, p, i.checked); l.append(i, ' ' + label); w.append(l); return w; }
   w.append(mk$('label', '', label));
   if (type === 'coloropt') {
     const r = mk$('div', 'row'), c = mk$('input'), k = mk$('input'); c.type = 'checkbox'; k.type = 'color'; r.dataset.p = p; r.dataset.t = type;
-    const u = () => setProp(id, p, c.checked ? k.value : ''); c.onchange = u; k.oninput = () => { c.checked = true; u(); }; r.append(c, k); w.append(r); return w;
+    const u = () => setProp(id, p, c.checked ? k.value : ''); c.onchange = u; k.oninput = () => { c.checked = true; u(); }; r.classList.add('cprow'); r.append(c, k, dropper(h => { k.value = h; c.checked = true; u(); })); w.append(r); return w;
   }
   let i;
   if (type === 'select') { i = mk$('select'); opt.forEach(([v, t]) => { const o = mk$('option', '', t); o.value = v; i.append(o); }); }
@@ -451,7 +470,8 @@ function mk(spec, id) {
     else if (type === 'select' && v !== '' && !isNaN(+v)) v = +v;
     setProp(id, p, v);
   };
-  w.append(i); return w;
+  if (type === 'color') { const r = mk$('div', 'cprow'); r.append(i, dropper(h => { i.value = h; setProp(id, p, h); })); w.append(r); } else w.append(i);
+  return w;
 }
 const GEO = [['x', 'X (px)', 'num'], ['y', 'Y (px)', 'num'], ['w', 'Ancho (px)', 'num', { min: 10 }], ['h', 'Alto (px)', 'num', { min: 10 }]];
 const WEIGHTS = [[400, 'Normal'], [600, 'Seminegrita'], [700, 'Negrita'], [800, 'Extranegrita']], FONTSEL = FONTS.map(f => [f, f]);

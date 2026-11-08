@@ -78,3 +78,4 @@ Sin `databaseURL` funciona en modo local (mismo navegador), solo para pruebas.
 - **Renombrar gráficos**: botón «Renombrar» junto a «Editando» y cuadro editable en cada fila de la lista de switches. Funciona con todos, incluidos los tres integrados (se guardan en `/slotNames`).
 - **Orden de los switches**: se quitaron «Antes» / «Después». Ahora se mantiene pulsada una fila y se arrastra hacia arriba o abajo (en el teléfono, desde las rayitas de la izquierda).
 - **Imán** (Diseño): al mover o cambiar el tamaño, el elemento se pega a bordes y centros de los demás elementos (de los gráficos abiertos) y del escenario, con una línea guía magenta. Alt lo desactiva al arrastrar; también hay una casilla «Pegar a otros elementos».
+- **Gotero**: botón «Gotero» junto a cada color. En Chrome y Edge usa el gotero del navegador (toma el color de cualquier punto de la pantalla); en otros navegadores se toca un elemento del editor y se copia su color. Esc cancela.
