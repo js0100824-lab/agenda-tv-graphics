@@ -2,7 +2,7 @@
 // Cada gráfico se sincroniza ELEMENTO por ELEMENTO: solo se reconstruye lo que cambió, así editar el titular
 // no reinicia la cintilla y pausar/reanudar la cinta se aplica en caliente, sin recargar nada.
 // Animaciones: el gráfico entra y sale con el motor de animations.js, como grupo completo o elemento por elemento.
-import { buildElement, arr } from './templates.js';
+import { buildElement, arr, layerOf } from './templates.js';
 import { normAnim, mergeAnim, playAnim, stopAnim, bbox } from './animations.js';
 
 const FULL = { x: 0, y: 0, w: 1920, h: 1080 };
@@ -55,7 +55,7 @@ export function createStage(root, opts = {}) {
   }
 
   function create(id, g) {
-    const el = document.createElement('div'); el.className = 'gfx'; stage.appendChild(el);
+    const el = document.createElement('div'); el.className = 'gfx'; el.style.zIndex = layerOf(id); stage.appendChild(el);
     const rec = { el, nodes: new Map(), g, seq: 0, leaving: false, busy: false, tok: 0, temp: false };
     live.set(id, rec); sync(rec, g); return rec;
   }

@@ -22,3 +22,9 @@ Sin `databaseURL` funciona en modo local (mismo navegador), solo para pruebas.
 - **Vista previa grande** (pestaña Diseño): botón «⤢ Ampliar»; Esc para cerrar.
 - **Plantilla «En blanco»** (sin elementos) en Plantillas y botón «Empezar en blanco» en Diseño.
 - **SALIDA AL AIRE**: un botón grande por gráfico (clic = mostrar y se pone en rojo; otro clic = ocultar). «+ Añadir gráfico» crea más (datos en `/slots`); se apilan en filas de tres.
+
+## Cambios de la última versión
+- **Capas**: la cintilla siempre va por encima; los demás gráficos entran y salen por detrás de ella, sin superponerse.
+- **Switches** (pestaña propia): fila PROGRAMA (rojo, al aire) y fila PREVIEW (verde), con el nombre de cada gráfico.
+- **Cintilla**: las noticias se pegan en un solo cuadro (separadas por Enter, | o •).
+- **Diseño** reorganizado en tarjetas; sin iconos ni emojis en la interfaz.

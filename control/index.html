@@ -4,56 +4,61 @@
 <link rel="stylesheet" href="../assets/gfx.css"><link rel="stylesheet" href="control.css"></head>
 <body>
 <aside><h1>AGENDA TV<small>GRAPHICS</small></h1>
-  <nav id="nav"><a data-tab="op" class="on">Operación</a><a data-tab="design">Diseño</a><a data-tab="anim">Animaciones</a><a data-tab="ticker">Cintilla</a><a data-tab="saved">Titulares guardados</a><a data-tab="tpl">Plantillas</a></nav>
+  <nav id="nav"><a data-tab="op" class="on">Operación</a><a data-tab="sw">Switches</a><a data-tab="design">Diseño</a><a data-tab="anim">Animaciones</a><a data-tab="ticker">Cintilla</a><a data-tab="saved">Titulares guardados</a><a data-tab="tpl">Plantillas</a></nav>
   <div class="foot"><div id="status" class="status">…</div><label>URL para OBS</label><input id="obsurl" readonly></div></aside>
 <main>
   <section class="monitors">
-    <div id="pvBox"><div class="pvh"><h2>PREVIEW</h2><button id="bigOpen" class="pvbtn" hidden>⤢ Ampliar</button></div><div class="bigbar" id="bigBar" hidden></div><div class="mon" id="mPrev"></div></div>
-    <div><h2 class="onair">PROGRAMA · OBS</h2><div class="mon air" id="mProg"></div></div>
+    <div id="pvBox"><div class="pvh"><h2>PREVIEW</h2><button id="bigOpen" class="pvbtn" hidden>Ampliar</button></div><div class="bigbar" id="bigBar" hidden></div><div class="mon" id="mPrev"></div></div>
+    <div><div class="pvh"><h2 class="onair">PROGRAMA · OBS</h2></div><div class="mon air" id="mProg"></div></div>
   </section>
-  <section class="airwrap" id="airWrap">
-    <div class="airhead"><h2>SALIDA AL AIRE</h2><button id="slotAdd" class="go">+ Añadir gráfico</button></div>
-    <div class="airpad" id="airpad"></div>
-  </section>
+  <section class="editbar" id="editbar"><span class="dlab">Editando</span><div class="seg" id="editBtns"></div></section>
   <section class="livebar" id="liveBar" hidden></section>
 
   <section class="panel tab" id="tab-op">
     <div class="cols"><div id="fields"></div>
       <div><h3>Animación</h3><div id="animQuick"></div>
-      <div class="pvbar"><button data-pv="in" class="go">▶ Entrada</button><button data-pv="out">▶ Salida</button><button data-pv="both">▶ Ambas</button><button data-pv="loop">⟲ Repetir</button></div>
+      <div class="pvbar"><button data-pv="in" class="go">Entrada</button><button data-pv="out">Salida</button><button data-pv="both">Ambas</button><button data-pv="loop">Repetir</button></div>
       <p class="hint">Las pruebas solo se ven en PREVIEW; no afectan a lo que está en aire. Más opciones en la pestaña Animaciones.</p></div></div>
-    <div class="btns"><button id="bPrev">Previsualizar</button><button id="bUpd" class="go">Actualizar en aire</button><button id="bClr">Limpiar</button></div>
-    <p class="hint">Para sacar o quitar un gráfico del aire usa los botones grandes de «SALIDA AL AIRE» (arriba): un clic lo muestra y se pone en rojo; otro clic lo oculta.</p>
+    <div class="btns"><button id="bPrev">Previsualizar</button>
+      <button id="bUpd" class="go">Actualizar en aire</button><button id="bClr">Limpiar</button></div>
+    <p class="hint">Para sacar un gráfico al aire o quitarlo usa la pestaña Switches.</p>
+  </section>
+
+  <section class="panel tab" id="tab-sw" hidden>
+    <div class="swhead"><h2>MESA DE SWITCHES</h2><button id="slotAdd" class="go">Añadir gráfico</button></div>
+    <div class="swblock"><div class="swlab prog">PROGRAMA</div><div class="swrow" id="swProg"></div></div>
+    <div class="swblock"><div class="swlab prev">PREVIEW</div><div class="swrow" id="swPrev"></div></div>
+    <div id="swMgr"></div>
+    <p class="hint">PROGRAMA: un clic saca el gráfico al aire (rojo) y otro clic lo oculta. PREVIEW: enciende o apaga el gráfico en la vista previa (verde) y lo deja seleccionado para editarlo.</p>
   </section>
 
   <section class="panel tab" id="tab-design" hidden>
-    <div class="cols3">
-      <div>
-        <div class="adds"><button id="bigPv" class="go">⤢ Vista previa grande</button><button id="tBlank">Empezar en blanco</button></div>
-        <h3>Elementos</h3><div id="elList" class="elist"></div>
-        <div class="adds"><button id="addText">+ Texto</button><button id="addLogo">+ Logotipo</button><button id="addImg">+ Imagen</button><button id="addShape">+ Forma</button><button id="addTicker">+ Cintilla</button></div>
-        <h3>Selección y grupos</h3>
-        <p class="hint" id="selInfo"></p><input id="gName" placeholder="Nombre del grupo" hidden>
-        <div class="adds"><button id="gAll">Seleccionar todo</button><button id="gGroup" class="go">Agrupar</button><button id="gUngroup">Desagrupar</button><button id="gDup">Duplicar grupo</button><button id="gLock">🔒 Bloquear</button></div>
-        <h3>Alinear</h3>
-        <div class="adds" id="alignBar"></div>
-        <div class="adds"><select id="alignRef" hidden><option value="sel">Respecto a la selección</option><option value="stage">Respecto al escenario</option></select></div>
-        <h3>Guardar como plantilla</h3>
-        <div class="row"><input id="tName" placeholder="Nombre de la plantilla"><button id="tSave" class="go">Guardar</button></div>
-        <p class="hint">Haz clic en PREVIEW para seleccionar (Mayús + clic suma elementos; doble clic entra en un grupo). Arrastra para mover y usa el cuadro de la esquina para cambiar el tamaño: en grupos y selecciones múltiples siempre mantiene proporciones. Flechas: mover 1 px (Mayús: 10 px).</p>
+    <div class="dtool">
+      <div class="dgrp"><span class="dlab">Vista</span><button id="bigPv" class="go">Vista previa grande</button><button id="tBlank">Empezar en blanco</button></div>
+      <div class="dgrp"><span class="dlab">Añadir</span><button id="addText">Texto</button><button id="addLogo">Logotipo</button><button id="addImg">Imagen</button><button id="addShape">Forma</button><button id="addTicker">Cintilla</button></div>
+    </div>
+    <div class="dcols">
+      <div class="dside">
+        <div class="dcard"><h3>Elementos</h3><div id="elList" class="elist"></div></div>
+        <div class="dcard"><h3>Selección y grupos</h3>
+          <p class="hint" id="selInfo"></p><input id="gName" placeholder="Nombre del grupo" hidden>
+          <div class="bgrid2"><button id="gAll">Seleccionar todo</button><button id="gGroup" class="go">Agrupar</button><button id="gUngroup">Desagrupar</button><button id="gDup">Duplicar grupo</button><button id="gLock">Bloquear</button></div></div>
+        <div class="dcard"><h3>Alinear</h3><select id="alignRef" hidden><option value="sel">Respecto a la selección</option><option value="stage">Respecto al escenario</option></select><div class="bgrid3" id="alignBar"></div></div>
+        <details class="dcard"><summary>Guardar como plantilla</summary><div class="row"><input id="tName" placeholder="Nombre de la plantilla"><button id="tSave" class="go">Guardar</button></div></details>
+        <details class="dcard"><summary>Ayuda</summary><p class="hint">Clic en PREVIEW selecciona. Mayús + clic suma elementos. Doble clic entra en un grupo. Arrastra para mover y usa el cuadro de la esquina para cambiar el tamaño (en grupos siempre mantiene proporciones). Flechas del teclado: mover 1 px, con Mayús 10 px.</p></details>
       </div>
-      <div id="insp"></div>
+      <div id="insp" class="dmain"></div>
     </div>
   </section>
 
   <section class="panel tab" id="tab-anim" hidden>
-    <div class="pvbar"><button data-pv="in" class="go">▶ Entrada</button><button data-pv="out">▶ Salida</button><button data-pv="both">▶ Ambas</button><button data-pv="loop">⟲ Repetir</button></div>
+    <div class="pvbar"><button data-pv="in" class="go">Entrada</button><button data-pv="out">Salida</button><button data-pv="both">Ambas</button><button data-pv="loop">Repetir</button></div>
     <p class="hint">Prueba las animaciones en PREVIEW antes de mostrarlas. Con «Repetir» puedes cambiar duración o estilo y ver el resultado al instante. Si no eliges salida, se usa la inversa de la entrada.</p>
     <h3>Animación del gráfico</h3><div id="animFull"></div>
     <h3>Animación por elemento</h3><div id="animEl"></div>
   </section>
 
-  <section class="panel tab" id="tab-ticker" hidden><div id="tkInsp"></div></section>
+  <section class="panel tab" id="tab-ticker" hidden><div id="tkInsp" class="dmain"></div></section>
 
   <section class="panel tab" id="tab-saved" hidden>
     <h3>Guardar el titular actual</h3>

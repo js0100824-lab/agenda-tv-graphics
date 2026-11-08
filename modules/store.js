@@ -63,6 +63,7 @@ export function setGraphic(id, g) {   // reemplaza el gráfico completo del borr
   emit(); return db.set(`draft/${id}`, state.draft[id]);
 }
 export function preview(id) { state.draft[id].visible = true; emit(); return db.set(`draft/${id}`, state.draft[id]); }
+export function unpreview(id) { state.draft[id].visible = false; emit(); return db.set(`draft/${id}`, state.draft[id]); }
 export function clearDraft(id) {
   state.draft[id].elements.forEach(e => { if (e.type === 'text') e.text = ''; });
   emit(); return db.set(`draft/${id}`, state.draft[id]);

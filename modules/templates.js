@@ -6,17 +6,20 @@ export const FONTS = ['Segoe UI', 'Arial', 'Arial Black', 'Impact', 'Verdana', '
 
 // Ranuras de salida: cada una es un gráfico independiente en /draft y /program.
 export const SLOTS = {
-  headline:  { name: 'Gráfico principal', tpl: 'titulo_sub' },
-  ticker:    { name: 'Cintilla inferior', tpl: 'cintilla' },
-  nameplate: { name: 'Nombre / cargo',    tpl: 'nameplate' }
+  headline:  { name: 'Gráfico principal', tpl: 'titulo_sub', layer: 2 },
+  ticker:    { name: 'Cintilla inferior', tpl: 'cintilla', layer: 9 },
+  nameplate: { name: 'Nombre / cargo',    tpl: 'nameplate', layer: 3 }
 };
 
 // Gráficos adicionales creados por el usuario (se guardan en /slots y se suman a los tres integrados)
 export function setCustomSlots(map) {
   for (const k of Object.keys(SLOTS)) if (SLOTS[k].custom) delete SLOTS[k];
   Object.entries(map || {}).filter(([, v]) => v).sort((a, b) => (a[1].ts || 0) - (b[1].ts || 0))
-    .forEach(([id, v]) => { if (!SLOTS[id]) SLOTS[id] = { name: v.name || 'Gráfico', tpl: 'blank', custom: true }; });
+    .forEach(([id, v]) => { if (!SLOTS[id]) SLOTS[id] = { name: v.name || 'Gráfico', tpl: 'blank', custom: true, layer: 4 }; });
 }
+
+// Capa de cada gráfico: la cintilla va siempre por encima; el resto entra por detrás de ella.
+export const layerOf = id => (SLOTS[id] && SLOTS[id].layer) || 4;
 
 export const uid = () => Math.random().toString(36).slice(2, 9);
 export const arr = v => Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v) : []);
@@ -127,7 +130,7 @@ export function instantiate(tpl, prev) {
   });
   els.forEach(e => {
     if (e.type === 'text' && e.role in old) e.text = old[e.role];
-    if (e.type === 'ticker' && oldTk) e.items = clone(arr(oldTk.items));
+    if (e.type === 'ticker' && oldTk) { e.items = clone(arr(oldTk.items)); e.raw = oldTk.raw; }
     if (e.type === 'image' && e.role === 'logo' && !e.src && oldLogo) { e.src = oldLogo.src; e.ar = oldLogo.ar; }
   });
   return { template: tpl.key || 'custom', elements: els, groups: clone(tpl.groups || {}), anim: clone(tpl.anim || { in: 'left', duration: 700 }) };

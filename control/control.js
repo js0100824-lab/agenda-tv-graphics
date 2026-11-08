@@ -80,6 +80,7 @@ function setTab(t) {
   tab = t;
   document.querySelectorAll('#nav a').forEach(x => x.classList.toggle('on', x.dataset.tab === t));
   document.querySelectorAll('.tab').forEach(x => x.hidden = x.id !== 'tab-' + t);
+  document.body.classList.toggle('sw', t === 'sw');
   if (t !== 'design') closeBig();
   $('bigOpen').hidden = t !== 'design';
   if (t === 'design' && draftOf() && !draftOf().visible) store.mutate(sel, () => {});
@@ -88,28 +89,41 @@ function setTab(t) {
 document.querySelectorAll('#nav a').forEach(a => a.onclick = () => setTab(a.dataset.tab));
 
 // ---------- Selector de gráfico y barra en vivo ----------
-// ---------- Salida al aire: un botón por gráfico (clic = mostrar en rojo, otro clic = ocultar) ----------
+// ---------- Switches: PROGRAMA (rojo, al aire) y PREVIEW (verde) ----------
 function toggleAir(id) { const pg = store.get().program[id]; if (pg && pg.visible) store.hide(id); else store.show(id); }
+function toggleView(id) {
+  const d = store.get().draft[id]; if (!d) return;
+  if (id !== sel) selectSlot(id);
+  if (d.visible) store.unpreview(id); else store.preview(id);
+}
 function selectSlot(id) {
   loopOn = false; syncLoopBtns(); prev.stopTest(sel); sel = id;
   ['fields', 'animQuick', 'animFull', 'animEl', 'insp'].forEach(i => { $(i).dataset.k = ''; }); render(store.get());
 }
-function buildAirpad(s) {
-  const box = $('airpad'), ids = Object.keys(SLOTS);
-  const key = ids.map(id => [id, SLOTS[id].name, !!(s.program[id] && s.program[id].visible), id === sel].join(':')).join('|');
+function buildEditbar() {
+  const box = $('editBtns'), ids = Object.keys(SLOTS), key = ids.map(id => id + SLOTS[id].name + (id === sel)).join('|');
   if (box.dataset.k === key) return; box.dataset.k = key; box.innerHTML = '';
-  ids.forEach(id => {
-    const on = !!(s.program[id] && s.program[id].visible), cell = mk$('div', 'acell' + (id === sel ? ' sel' : ''));
-    const b = mk$('button', 'abtn' + (on ? ' on' : ''));
-    b.innerHTML = `<span class="an">${esc(SLOTS[id].name)}</span><span class="as">${on ? '● EN AIRE · clic para ocultar' : 'Clic para mostrar'}</span>`;
-    b.onclick = () => toggleAir(id);
-    const side = mk$('div', 'aside'), add = (t, f) => { const x = mk$('button', '', t); x.onclick = f; side.append(x); };
-    add(id === sel ? '✎ Editando' : '✎ Editar', () => selectSlot(id));
-    if (SLOTS[id].custom) {
-      add('Renombrar', () => { const n = (prompt('Nuevo nombre:', SLOTS[id].name) || '').trim(); if (n) store.renameSlot(id, n); });
-      add('Eliminar', () => { if (confirm(`¿Eliminar el gráfico «${SLOTS[id].name}»? Se borra también su diseño.`)) { if (sel === id) selectSlot('headline'); store.removeSlot(id); } });
-    }
-    cell.append(b, side); box.append(cell);
+  ids.forEach(id => { const b = mk$('button', 'segb' + (id === sel ? ' on' : ''), SLOTS[id].name); b.onclick = () => selectSlot(id); box.append(b); });
+}
+function buildAirpad(s) {
+  const ids = Object.keys(SLOTS), live = id => !!(s.program[id] && s.program[id].visible), view = id => !!(s.draft[id] && s.draft[id].visible);
+  const key = ids.map(id => [id, SLOTS[id].name, live(id), view(id), id === sel].join(':')).join('|'), rows = $('swProg');
+  if (rows.dataset.k === key) return; rows.dataset.k = key;
+  [['swProg', true], ['swPrev', false]].forEach(([rid, isProg]) => {
+    const row = $(rid); row.innerHTML = '';
+    ids.forEach(id => {
+      const on = isProg ? live(id) : view(id);
+      const b = mk$('button', 'sbtn ' + (isProg ? 'prog' : 'prev') + (on ? ' on' : '') + (!isProg && id === sel ? ' sel' : ''), SLOTS[id].name);
+      b.onclick = () => isProg ? toggleAir(id) : toggleView(id); row.append(b);
+    });
+  });
+  const mg = $('swMgr'); mg.innerHTML = ''; mg.className = 'swmgr';
+  ids.filter(id => SLOTS[id].custom).forEach(id => {
+    const r = mk$('div', 'mrow'), add = (t, f) => { const x = mk$('button', t === 'Eliminar' ? 'danger' : '', t); x.onclick = f; r.append(x); };
+    r.append(mk$('span', '', SLOTS[id].name));
+    add('Renombrar', () => { const n = (prompt('Nuevo nombre:', SLOTS[id].name) || '').trim(); if (n) store.renameSlot(id, n); });
+    add('Eliminar', () => { if (confirm(`¿Eliminar el gráfico «${SLOTS[id].name}»? Se borra también su diseño.`)) { if (sel === id) selectSlot('headline'); store.removeSlot(id); } });
+    mg.append(r);
   });
 }
 $('slotAdd').onclick = () => {
@@ -123,7 +137,7 @@ function buildLive(s) {
   box.hidden = false;
   const pg = s.program[sel], src = (pg && pg.visible && arr(pg.elements).find(e => e.id === tk.id)) || tk;
   const paused = !!src.paused, on = src.on !== false;
-  const html = `<span>CINTILLA «${esc(tk.name)}» (EN VIVO)</span><button id="lvP">${paused ? '▶ Reanudar' : '⏸ Pausar'}</button><button id="lvO" class="${on ? 'danger' : 'go'}">${on ? 'Ocultar cintilla' : 'Activar cintilla'}</button>`;
+  const html = `<span>CINTILLA «${esc(tk.name)}» (EN VIVO)</span><button id="lvP">${paused ? 'Reanudar' : 'Pausar'}</button><button id="lvO" class="${on ? 'danger' : 'go'}">${on ? 'Ocultar cintilla' : 'Activar cintilla'}</button>`;
   if (box.dataset.k === html) return; box.dataset.k = html; box.innerHTML = html;
   $('lvP').onclick = () => store.live(sel, tk.id, { paused: !paused });
   $('lvO').onclick = () => store.live(sel, tk.id, { on: !on });
@@ -177,7 +191,7 @@ function animFields(box, scope, el, full) {
   if (full) {
     F('inDelay', 'Retardo de entrada (ms)', 'num', { min: 0, max: 10000, step: 50 });
     F('outDelay', 'Retardo de salida (ms)', 'num', { min: 0, max: 10000, step: 50 });
-    if (!inh) F('speed', 'Velocidad (×, 1 = normal)', 'num', { min: .25, max: 4, step: .25 });
+    if (!inh) F('speed', 'Velocidad (1 = normal)', 'num', { min: .25, max: 4, step: .25 });
     if (!inh && ga.mode === 'elements') F('stagger', 'Desfase entre elementos (ms)', 'num', { min: 0, max: 2000, step: 20 });
   }
 }
@@ -240,7 +254,7 @@ function pickImage(cb) {
 const applyImage = (id, r, resize) => edit(id, e => { e.src = r.src; e.ar = r.ar; if (resize) e.h = Math.max(10, Math.round(e.w / r.ar)); });
 
 // ---------- Pestaña Diseño: lista, altas y propiedades ----------
-const ICON = { text: 'T', image: '▣', shape: '▭', ticker: '≡' };
+const TYPE = { text: 'Texto', image: 'Imagen', shape: 'Forma', ticker: 'Cintilla' };
 function renderList(g) {
   const box = $('elList'), els = elsOf(g), s = S(), groups = grpOf(g);
   const key = [sel, s.id, s.grp, [...s.multi].join(), els.map(e => [e.id, e.name, e.on === false, e.group, e.locked].join(':')).join(),
@@ -248,15 +262,16 @@ function renderList(g) {
   if (box.dataset.k === key) return; box.dataset.k = key; box.innerHTML = '';
   const rev = els.slice().reverse(), done = new Set();
   const row = (e, child) => {
-    const r = mk$('div', 'erow' + (child ? ' child' : '') + (s.multi.has(e.id) ? (s.grp ? ' in' : ' on') : '') + (e.on === false ? ' off' : ''),
-      `${ICON[e.type] || '?'}  ${e.name || e.type}${e.locked ? ' 🔒' : ''}`);
+    const r = mk$('div', 'erow' + (child ? ' child' : '') + (s.multi.has(e.id) ? (s.grp ? ' in' : ' on') : '') + (e.on === false ? ' off' : ''));
+    r.append(mk$('span', 'etype', TYPE[e.type] || ''), mk$('span', 'ename', e.name || e.type)); if (e.locked) r.append(mk$('span', 'etag', 'Bloqueado'));
     r.onclick = ev => { if (ev.shiftKey || ev.ctrlKey || ev.metaKey) toggleMulti(e.id); else selectOne(e.id); }; box.append(r);
   };
   rev.forEach(e => {
     if (e.group && groups[e.group]) {
       if (done.has(e.group)) return; done.add(e.group);
       const m = rev.filter(x => x.group === e.group), meta = groups[e.group];
-      const h = mk$('div', 'erow grp' + (s.grp === e.group ? ' on' : ''), `📁  ${meta.name || 'Grupo'} (${m.length})${meta.locked ? ' 🔒' : ''}`);
+      const h = mk$('div', 'erow grp' + (s.grp === e.group ? ' on' : ''));
+      h.append(mk$('span', 'etype', 'Grupo'), mk$('span', 'ename', `${meta.name || 'Grupo'} (${m.length})`)); if (meta.locked) h.append(mk$('span', 'etag', 'Bloqueado'));
       h.onclick = () => selectGroup(e.group); box.append(h); m.forEach(x => row(x, true));
     } else row(e, false);
   });
@@ -304,7 +319,7 @@ $('gLock').onclick = () => {
 };
 $('gName').oninput = () => { const gid = S().grp; if (gid) store.mutate(sel, g => { if (g.groups && g.groups[gid]) g.groups[gid].name = $('gName').value; }); };
 
-const ALIGNS = [['left', '⇤ Izquierda'], ['hc', '↔ Centro H'], ['right', 'Derecha ⇥'], ['top', '⤒ Arriba'], ['vc', '↕ Centro V'], ['bottom', 'Abajo ⤓']];
+const ALIGNS = [['left', 'Izquierda'], ['hc', 'Centro H'], ['right', 'Derecha'], ['top', 'Arriba'], ['vc', 'Centro V'], ['bottom', 'Abajo']];
 const ALIGN = {
   left: (r, R) => ({ dx: R.x - r.x }), hc: (r, R) => ({ dx: R.x + R.w / 2 - (r.x + r.w / 2) }), right: (r, R) => ({ dx: R.x + R.w - (r.x + r.w) }),
   top: (r, R) => ({ dy: R.y - r.y }), vc: (r, R) => ({ dy: R.y + R.h / 2 - (r.y + r.h / 2) }), bottom: (r, R) => ({ dy: R.y + R.h - (r.y + r.h) })
@@ -331,7 +346,7 @@ function distribute(axis) {
 }
 (() => {
   const bar = $('alignBar'), add = (t, f) => { const b = mk$('button', '', t); b.onclick = f; bar.append(b); };
-  ALIGNS.forEach(([m, t]) => add(t, () => align(m))); add('⇔ Distribuir H', () => distribute('h')); add('⇕ Distribuir V', () => distribute('v'));
+  ALIGNS.forEach(([m, t]) => add(t, () => align(m))); add('Distribuir H', () => distribute('h')); add('Distribuir V', () => distribute('v'));
 })();
 function renderSelUI(g) {
   const t = target(), s = S(), meta = s.grp ? grpOf(g)[s.grp] : null, e1 = curEl(), ag = activeGroup();
@@ -339,7 +354,7 @@ function renderSelUI(g) {
     : e1 ? `Elemento: ${e1.name || e1.type}${e1.group ? ' (dentro de un grupo)' : ''}` : 'Sin selección';
   $('gGroup').disabled = !(t.els.length > 1 && !t.group); $('gUngroup').disabled = $('gDup').disabled = !ag;
   const lk = s.grp ? !!(meta || {}).locked : t.els.some(e => e.locked);
-  $('gLock').textContent = lk ? '🔓 Desbloquear' : '🔒 Bloquear';
+  $('gLock').textContent = lk ? 'Desbloquear' : 'Bloquear';
   const gn = $('gName'); gn.hidden = !s.grp; if (s.grp && document.activeElement !== gn) gn.value = (meta || {}).name || '';
   $('alignRef').hidden = !(t.els.length > 1 && !t.group);
   bigInfo.textContent = $('selInfo').textContent;
@@ -353,7 +368,7 @@ function setProp(id, p, v) {
   });
 }
 function mk(spec, id) {
-  const [p, label, type, opt] = spec, w = mk$('div', 'f');
+  const [p, label, type, opt] = spec, w = mk$('div', 'f' + (type === 'area' ? ' wide' : ''));
   if (type === 'check') { const l = mk$('label', 'chk'), i = mk$('input'); i.type = 'checkbox'; i.dataset.p = p; i.dataset.t = type; i.onchange = () => setProp(id, p, i.checked); l.append(i, ' ' + label); w.append(l); return w; }
   w.append(mk$('label', '', label));
   if (type === 'coloropt') {
@@ -374,40 +389,41 @@ function mk(spec, id) {
   w.append(i); return w;
 }
 const GEO = [['x', 'X (px)', 'num'], ['y', 'Y (px)', 'num'], ['w', 'Ancho (px)', 'num', { min: 10 }], ['h', 'Alto (px)', 'num', { min: 10 }]];
-const SPECS = {
-  text: [['text', 'Texto', 'area'], ['font', 'Tipografía', 'select', FONTS.map(f => [f, f])], ['size', 'Tamaño máximo (px)', 'num', { min: 6, max: 400 }], ['minSize', 'Tamaño mínimo (px)', 'num', { min: 6, max: 400 }],
-    ['weight', 'Grosor', 'select', [[400, 'Normal'], [600, 'Seminegrita'], [700, 'Negrita'], [800, 'Extranegrita']]], ['align', 'Alineación', 'select', [['left', 'Izquierda'], ['center', 'Centro'], ['right', 'Derecha']]],
-    ['valign', 'Alineación vertical', 'select', [['top', 'Arriba'], ['middle', 'Centro'], ['bottom', 'Abajo']]], ['color', 'Color del texto', 'color'], ['bg', 'Color de fondo', 'coloropt'],
-    ['padX', 'Margen lateral (px)', 'num', { min: 0 }], ['lh', 'Interlineado', 'num', { min: .8, max: 2, step: .05 }], ['upper', 'Mayúsculas', 'check'], ['autofit', 'Ajuste automático (reduce el texto si no cabe)', 'check']],
-  image: [['fit', 'Ajuste', 'select', [['contain', 'Mantener proporciones'], ['cover', 'Rellenar (recorta)']]], ['lock', 'Bloquear proporciones al redimensionar', 'check'],
-    ['opacity', 'Opacidad', 'num', { min: 0, max: 1, step: .05 }], ['radius', 'Redondeo (px)', 'num', { min: 0 }], ['bg', 'Color de fondo', 'coloropt']],
-  shape: [['color', 'Color', 'color'], ['opacity', 'Opacidad', 'num', { min: 0, max: 1, step: .05 }], ['radius', 'Redondeo (px)', 'num', { min: 0 }]],
-  ticker: [['speed', 'Velocidad (px/s)', 'num', { min: 10, max: 1000, step: 10 }], ['dir', 'Dirección', 'select', [['left', '← Hacia la izquierda'], ['right', '→ Hacia la derecha']]],
-    ['font', 'Tipografía', 'select', FONTS.map(f => [f, f])], ['size', 'Tamaño de letra (px)', 'num', { min: 10, max: 200 }], ['weight', 'Grosor', 'select', [[400, 'Normal'], [600, 'Seminegrita'], [700, 'Negrita'], [800, 'Extranegrita']]],
-    ['color', 'Color del texto', 'color'], ['bg', 'Color de fondo', 'color'], ['upper', 'Mayúsculas', 'check'],
-    ['sep', 'Separador entre noticias', 'text', { list: 'sepList' }], ['sepColor', 'Color del separador', 'color'], ['sepGap', 'Espacio alrededor del separador (px)', 'num', { min: 0 }],
-    ['label', 'Etiqueta izquierda (vacía = sin etiqueta)', 'text'], ['labelBg', 'Fondo de la etiqueta', 'color'], ['labelColor', 'Color de la etiqueta', 'color']]
+const WEIGHTS = [[400, 'Normal'], [600, 'Seminegrita'], [700, 'Negrita'], [800, 'Extranegrita']], FONTSEL = FONTS.map(f => [f, f]);
+const SECTIONS = {
+  text: [['Contenido', [['text', 'Texto', 'area']]],
+    ['Tipografía', [['font', 'Tipografía', 'select', FONTSEL], ['size', 'Tamaño máximo (px)', 'num', { min: 6, max: 400 }], ['minSize', 'Tamaño mínimo (px)', 'num', { min: 6, max: 400 }],
+      ['weight', 'Grosor', 'select', WEIGHTS], ['upper', 'Mayúsculas', 'check'], ['autofit', 'Ajuste automático del texto', 'check']]],
+    ['Alineación y márgenes', [['align', 'Alineación', 'select', [['left', 'Izquierda'], ['center', 'Centro'], ['right', 'Derecha']]],
+      ['valign', 'Alineación vertical', 'select', [['top', 'Arriba'], ['middle', 'Centro'], ['bottom', 'Abajo']]], ['padX', 'Margen lateral (px)', 'num', { min: 0 }], ['lh', 'Interlineado', 'num', { min: .8, max: 2, step: .05 }]]],
+    ['Colores', [['color', 'Color del texto', 'color'], ['bg', 'Color de fondo', 'coloropt']]]],
+  image: [['Imagen', [['fit', 'Ajuste', 'select', [['contain', 'Mantener proporciones'], ['cover', 'Rellenar (recorta)']]], ['opacity', 'Opacidad', 'num', { min: 0, max: 1, step: .05 }],
+      ['radius', 'Redondeo (px)', 'num', { min: 0 }], ['lock', 'Bloquear proporciones al redimensionar', 'check']]], ['Colores', [['bg', 'Color de fondo', 'coloropt']]]],
+  shape: [['Forma', [['color', 'Color', 'color'], ['opacity', 'Opacidad', 'num', { min: 0, max: 1, step: .05 }], ['radius', 'Redondeo (px)', 'num', { min: 0 }]]]],
+  ticker: [['Movimiento', [['speed', 'Velocidad (px/s)', 'num', { min: 10, max: 1000, step: 10 }], ['dir', 'Dirección', 'select', [['left', 'Hacia la izquierda'], ['right', 'Hacia la derecha']]]]],
+    ['Texto', [['font', 'Tipografía', 'select', FONTSEL], ['size', 'Tamaño de letra (px)', 'num', { min: 10, max: 200 }], ['weight', 'Grosor', 'select', WEIGHTS], ['upper', 'Mayúsculas', 'check']]],
+    ['Colores', [['color', 'Color del texto', 'color'], ['bg', 'Color de fondo', 'color']]],
+    ['Separador entre noticias', [['sep', 'Separador', 'text', { list: 'sepList' }], ['sepColor', 'Color del separador', 'color'], ['sepGap', 'Espacio alrededor (px)', 'num', { min: 0 }]]],
+    ['Etiqueta izquierda', [['label', 'Texto (vacío = sin etiqueta)', 'text'], ['labelBg', 'Fondo de la etiqueta', 'color'], ['labelColor', 'Color del texto', 'color']]]]
 };
-const grid = (specs, id) => { const d = mk$('div', 'grid2'); specs.forEach(s => d.append(mk(s, id))); return d; };
+const grid = (specs, id) => { const d = mk$('div', 'gx'); specs.forEach(s => d.append(mk(s, id))); return d; };
+const card = (title, body) => { const c = mk$('div', 'dcard'); c.append(mk$('h3', '', title), body); return c; };
 
+// Las noticias se pegan en un solo cuadro; se separan por Enter, | o • (sin separadores = un solo texto continuo)
+const parseNews = raw => String(raw || '').split(/\r?\n|\||•|●|◆|■|★|\/\//).map(x => x.trim()).filter(Boolean);
 function buildNews(e) {
-  const wrap = mk$('div'), list = mk$('div', 'news'); wrap.append(mk$('h3', '', 'Noticias'), list);
-  arr(e.items).forEach((t, i) => {
-    const r = mk$('div', 'nr'), inp = mk$('input'); inp.value = t; inp.dataset.news = i;
-    inp.oninput = () => edit(e.id, x => { x.items[i] = inp.value; });
-    const mv = (d) => edit(e.id, x => { const j = i + d; if (j < 0 || j >= x.items.length) return; [x.items[i], x.items[j]] = [x.items[j], x.items[i]]; });
-    const up = mk$('button', '', '↑'), dn = mk$('button', '', '↓'), rm = mk$('button', 'danger', '✕');
-    up.onclick = () => mv(-1); dn.onclick = () => mv(1); rm.onclick = () => edit(e.id, x => { x.items.splice(i, 1); });
-    r.append(inp, up, dn, rm); list.append(r);
-  });
-  const add = mk$('button', 'go', '+ Añadir noticia'); add.onclick = () => edit(e.id, x => { x.items.push('Nueva noticia'); });
-  wrap.append(add); return wrap;
+  const w = mk$('div'), t = mk$('textarea'), n = mk$('p', 'hint');
+  t.rows = 7; t.dataset.raw = '1'; t.placeholder = 'Pega aquí el texto de la cintilla, con todas las noticias seguidas…';
+  t.oninput = () => edit(e.id, x => { x.raw = t.value; x.items = parseNews(t.value); });
+  n.dataset.cnt = '1';
+  w.append(t, n, mk$('p', 'hint', 'Pega todo el texto de una vez. Para separar noticias usa Enter, | o •: entre una y otra se coloca el separador elegido. Si no hay separadores, se muestra como un solo texto continuo.'));
+  return w;
 }
 function buildActions(e) {
   const a = mk$('div', 'arow'), b = (t, f, c) => { const x = mk$('button', c || '', t); x.onclick = f; a.append(x); return x; };
   if (e.type === 'image') { b('Subir / cambiar imagen', () => pickImage(r => applyImage(e.id, r, false)), 'go'); b('Quitar imagen', () => edit(e.id, x => { x.src = ''; })); }
   b('Duplicar', () => { const c = clone(e); c.id = uid(); delete c.group; c.name = (e.name || e.type) + ' (copia)'; c.x += 30; c.y += 30; addEl(c); });
-  b('▲ Al frente', () => moveZ(1)); b('▼ Atrás', () => moveZ(-1));
+  b('Traer al frente', () => moveZ(1)); b('Enviar atrás', () => moveZ(-1));
   b('Eliminar', () => { store.mutate(sel, g => { g.elements = g.elements.filter(x => x.id !== e.id); cleanGroups(g); }); S().id = null; render(store.get()); }, 'danger');
   return a;
 }
@@ -416,16 +432,15 @@ function moveZ(d) {
 }
 function renderInsp(box, e, kind) {
   if (!e) { box.dataset.k = ''; box.innerHTML = '<p class="hint">Selecciona un elemento.</p>'; return; }
-  const key = [sel, kind, e.id, e.type, e.type === 'ticker' ? arr(e.items).length : ''].join('|');
+  const key = [sel, kind, e.id, e.type].join('|');
   if (box.dataset.k !== key) {
     box.dataset.k = key; box.innerHTML = '';
-    box.append(mk$('h3', '', (kind === 'ticker' ? 'Cintilla: ' : 'Propiedades: ') + (e.name || e.type)));
-    if (kind === 'ticker') {
-      box.append(buildNews(e), mk$('h3', '', 'Estilo y movimiento'), grid(SPECS.ticker, e.id), mk$('h3', '', 'Altura y posición de la cinta'), grid([['name', 'Nombre', 'text'], ...GEO], e.id));
-    } else {
-      box.append(grid([['name', 'Nombre', 'text'], ['on', 'Visible', 'check'], ['locked', 'Bloquear posición', 'check'], ...GEO], e.id), mk$('h3', '', 'Aspecto'), grid(SPECS[e.type] || [], e.id));
-      if (e.type === 'ticker') box.append(mk$('p', 'hint', 'Las noticias se editan en la pestaña Cintilla.'));
-    }
+    const head = mk$('div', 'dhead'); head.append(mk$('span', 'dtype', TYPE[e.type] || ''), mk$('b', '', e.name || e.type)); box.append(head);
+    if (kind === 'ticker') box.append(card('Noticias', buildNews(e)));
+    else box.append(card('General', grid([['name', 'Nombre', 'text'], ['on', 'Visible', 'check'], ['locked', 'Bloquear posición', 'check']], e.id)));
+    box.append(card(kind === 'ticker' ? 'Altura y posición de la cinta' : 'Posición y tamaño', grid(GEO, e.id)));
+    (SECTIONS[e.type] || []).forEach(([t, specs]) => box.append(card(t, grid(specs, e.id))));
+    if (e.type === 'ticker' && kind !== 'ticker') box.append(mk$('p', 'hint', 'Las noticias se editan en la pestaña Cintilla.'));
     if (kind !== 'ticker') box.append(buildActions(e));
   }
   box.querySelectorAll('[data-p]').forEach(i => {
@@ -434,7 +449,8 @@ function renderInsp(box, e, kind) {
     if (document.activeElement === i) return;
     if (t === 'check') i.checked = !!v; else i.value = v ?? '';
   });
-  box.querySelectorAll('[data-news]').forEach(i => { if (document.activeElement !== i) i.value = arr(e.items)[+i.dataset.news] ?? ''; });
+  box.querySelectorAll('[data-raw]').forEach(t => { if (document.activeElement !== t) t.value = e.raw ?? arr(e.items).join('\n'); });
+  box.querySelectorAll('[data-cnt]').forEach(n => { const c = arr(e.items).length; n.textContent = c === 1 ? '1 noticia detectada' : `${c} noticias detectadas`; });
 }
 function groupGeo(p, v) {   // X / Y / Ancho / Alto de un grupo o selección múltiple (el tamaño mantiene proporciones)
   if (!isFinite(v)) return; const t = target(), g = draftOf(); if (!t.els.length || isLocked(g, t)) return;
@@ -479,7 +495,7 @@ function drawOvl() {
   const b = bb(t.els), lk = isLocked(g, t), multi = t.els.length > 1;
   ovl.className = 'ovl' + (t.group ? ' grp' : multi ? ' multi' : '') + (lk ? ' lock' : '');
   Object.assign(ovl.style, { display: 'block', left: b.x + 'px', top: b.y + 'px', width: b.w + 'px', height: b.h + 'px' });
-  lbl.textContent = (lk ? '🔒 ' : '') + (t.group ? 'GRUPO: ' + ((grpOf(g)[t.group] || {}).name || '') : multi ? t.els.length + ' ELEMENTOS' : (t.els[0].name || t.els[0].type));
+  lbl.textContent = (lk ? 'BLOQUEADO · ' : '') + (t.group ? 'GRUPO: ' + ((grpOf(g)[t.group] || {}).name || '') : multi ? t.els.length + ' ELEMENTOS' : (t.els[0].name || t.els[0].type));
   lbl.style.top = b.y < 70 ? '10px' : '-54px'; lbl.style.left = '6px'; hd.style.display = lk ? 'none' : 'block';
   if (multi) t.els.forEach((e, i) => outline(i, e));
 }
@@ -582,7 +598,7 @@ function useTemplate(t) {
 }
 function addCard(grid, t, del) {
   const c = mk$('div', 'tcard'), th = mk$('div', 'thumb'); c.append(th); grid.append(c);
-  const b = mk$('b', '', t.name); if (del) { const x = mk$('button', 'tdel', '✕'); x.onclick = ev => { ev.stopPropagation(); if (confirm(`¿Eliminar la plantilla «${t.name}»?`)) store.deleteTemplate(t.id); }; b.prepend(x); }
+  const b = mk$('b', '', t.name); if (del) { const x = mk$('button', 'tdel', 'Eliminar'); x.onclick = ev => { ev.stopPropagation(); if (confirm(`¿Eliminar la plantilla «${t.name}»?`)) store.deleteTemplate(t.id); }; b.prepend(x); }
   c.append(b, mk$('small', '', t.desc || ''));
   c.onclick = () => useTemplate(t);
   createStage(th, { static: true, placeholders: true }).apply({ x: { visible: true, elements: t.elements, anim: t.anim } });
@@ -599,11 +615,11 @@ function renderTpl() {
 
 // ---------- Vista previa grande (pestaña Diseño) ----------
 const pvBox = $('pvBox'), bigSync = [], bigInfo = mk$('span', 'binfo');
-function closeBig() { pvBox.classList.remove('big'); $('bigBar').hidden = true; $('bigOpen').textContent = '⤢ Ampliar'; }
+function closeBig() { pvBox.classList.remove('big'); $('bigBar').hidden = true; $('bigOpen').textContent = 'Ampliar'; }
 function toggleBig() {
   if (pvBox.classList.contains('big')) { closeBig(); return; }
   if (tab !== 'design') return;
-  pvBox.classList.add('big'); $('bigBar').hidden = false; $('bigOpen').textContent = '✕ Cerrar (Esc)';
+  pvBox.classList.add('big'); $('bigBar').hidden = false; $('bigOpen').textContent = 'Cerrar (Esc)';
 }
 $('bigOpen').onclick = $('bigPv').onclick = toggleBig;
 addEventListener('keydown', ev => { if (ev.key === 'Escape') closeBig(); });
@@ -612,13 +628,13 @@ addEventListener('keydown', ev => { if (ev.key === 'Escape') closeBig(); });
   bar.append(bigInfo);
   ['gAll', 'gGroup', 'gUngroup', 'gDup', 'gLock'].forEach(id => bigSync.push([id, mkb('', () => $(id).click())]));
   bar.append(mk$('span', 'bsep'));
-  ALIGNS.forEach(([m, t]) => mkb(t, () => align(m))); mkb('⇔ Distribuir H', () => distribute('h')); mkb('⇕ Distribuir V', () => distribute('v'));
+  ALIGNS.forEach(([m, t]) => mkb(t, () => align(m))); mkb('Distribuir H', () => distribute('h')); mkb('Distribuir V', () => distribute('v'));
 })();
 
 // ---------- Render general ----------
 function render(s) {
   if (!SLOTS[sel]) sel = 'headline';
-  prev.apply(s.draft); prog.apply(s.program); buildAirpad(s);
+  prev.apply(s.draft); prog.apply(s.program); buildEditbar(); buildAirpad(s);
   const g = s.draft[sel]; if (!g) return;
   fixSel(g); buildLive(s);
   if (tab === 'op') { syncContent(g); renderAnim($('animQuick'), g, false); }
