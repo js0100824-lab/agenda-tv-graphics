@@ -225,3 +225,8 @@ main.dsg .editbar{position:sticky;top:0;z-index:30;background:#111418;padding:6p
 .dropb{flex:none;padding:6px 10px;border:0;border-radius:3px;background:#2a3340;color:#fff;cursor:pointer;font-weight:600;font-size:12px}
 .mon.ed.picking,.mon.ed.picking *{cursor:crosshair!important}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:300;background:#12161b;border:1px solid #38bdf8;border-radius:6px;padding:10px 16px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.6)}
+
+/* ---- Noticias de la cintilla editables una por una ---- */
+.nlist .nitem{align-items:flex-start;padding:6px 8px;font-size:13px}.nlist .nitem b{padding-top:8px}
+.nlist textarea.nin{flex:1;min-width:0;font-size:13px}
+.nbtn{display:flex;flex-direction:column;gap:4px}.nbtn button{padding:5px 10px;border:0;border-radius:3px;background:#2a3340;color:#fff;cursor:pointer;font-weight:600;font-size:12px}.nbtn button:disabled{opacity:.4;cursor:not-allowed}

@@ -511,6 +511,7 @@ function sentences(text) {
   }
   out.push(text.slice(start)); return out;
 }
+const setItems = (x, items) => { x.items = items; x.raw = items.join('\n'); x.split = 'lines'; };   // al editar una noticia suelta, el texto grande pasa a ser una noticia por línea
 const parseNews = (raw, mode = 'auto') => {
   const base = String(raw || '').split(/\r?\n|\||•|●|◆|■|★|\/\//).map(x => x.trim()).filter(Boolean);
   return mode === 'lines' ? base : base.flatMap(sentences).map(x => x.trim()).filter(Boolean);
@@ -523,7 +524,9 @@ function buildNews(e) {
   [['auto', 'Automático: Enter, | , • y fin de frase'], ['lines', 'Solo con Enter, | o •']].forEach(([v, l]) => { const o = mk$('option', '', l); o.value = v; sp.append(o); });
   sp.dataset.split = '1'; sp.onchange = () => edit(e.id, x => set(x, x.raw ?? arr(x.items).join('\n'), sp.value));
   n.dataset.cnt = '1'; list.dataset.list = '1';
-  w.append(t, mk$('label', '', 'Cómo separar las noticias'), sp, n, list);
+  const add = mk$('button', 'go', 'Añadir noticia'); add.type = 'button';
+  add.onclick = () => edit(e.id, x => { const it = arr(x.items).slice(); it.push(''); setItems(x, it); });
+  w.append(t, mk$('label', '', 'Cómo separar las noticias'), sp, n, mk$('label', '', 'Noticias (cada una se edita por separado)'), list, add);
   return w;
 }
 function buildActions(e) {
@@ -569,9 +572,21 @@ function renderInsp(box, e, kind) {
   box.querySelectorAll('[data-tex]').forEach(n => { n.textContent = e.tex ? 'Textura cargada. Se ve dentro del elemento; el color queda de fondo.' : 'Sin textura. Carga una imagen (PNG, JPG o WebP) para rellenar este elemento.'; });
   box.querySelectorAll('[data-raw]').forEach(t => { if (document.activeElement !== t) t.value = e.raw ?? arr(e.items).join('\n'); });
   box.querySelectorAll('[data-split]').forEach(i => { if (document.activeElement !== i) i.value = e.split || 'auto'; });
-  box.querySelectorAll('[data-list]').forEach(d => {   // lista de noticias detectadas, para ver dónde termina cada una
-    const items = arr(e.items), k = items.join('\u0001'); if (d.dataset.k === k) return; d.dataset.k = k; d.innerHTML = '';
-    items.forEach((t, i) => { const r = mk$('div', 'nitem'); r.append(mk$('b', '', String(i + 1)), mk$('span', '', t)); d.append(r); });
+  box.querySelectorAll('[data-list]').forEach(d => {   // una noticia por cuadro: se edita, sube, baja o elimina por separado
+    const items = arr(e.items), rows = d.querySelectorAll('textarea.nin');
+    if (rows.length === items.length) { rows.forEach((t, i) => { if (document.activeElement !== t && t.value !== items[i]) t.value = items[i]; }); return; }
+    d.innerHTML = '';
+    if (!items.length) { d.append(mk$('p', 'hint', 'Aún no hay noticias. Pega el texto arriba o pulsa «Añadir noticia».')); return; }
+    items.forEach((txt, i) => {
+      const r = mk$('div', 'nitem'), t = mk$('textarea', 'nin'), bt = mk$('div', 'nbtn');
+      t.rows = 2; t.value = txt;
+      t.oninput = () => edit(e.id, x => { const it = arr(x.items).slice(); it[i] = t.value.replace(/\r?\n/g, ' '); setItems(x, it); });
+      const b = (label, title, fn, dis, cls) => { const x = mk$('button', cls || '', label); x.type = 'button'; x.title = title; x.disabled = !!dis; x.onclick = fn; bt.append(x); };
+      const move = j => edit(e.id, x => { const it = arr(x.items).slice(); [it[i], it[j]] = [it[j], it[i]]; setItems(x, it); });
+      b('Subir', 'Subir una posición', () => move(i - 1), i === 0); b('Bajar', 'Bajar una posición', () => move(i + 1), i === items.length - 1);
+      b('Eliminar', 'Eliminar esta noticia', () => edit(e.id, x => { const it = arr(x.items).slice(); it.splice(i, 1); setItems(x, it); }), false, 'danger');
+      r.append(mk$('b', '', String(i + 1)), t, bt); d.append(r);
+    });
   });
   box.querySelectorAll('[data-cnt]').forEach(n => { const c = arr(e.items).length; n.textContent = c === 1 ? '1 noticia detectada' : `${c} noticias detectadas`; });
 }
