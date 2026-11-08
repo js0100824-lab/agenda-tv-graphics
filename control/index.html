@@ -4,9 +4,9 @@
 <link rel="stylesheet" href="../assets/gfx.css"><link rel="stylesheet" href="control.css"></head>
 <body>
 <aside><h1>AGENDA TV<small>GRAPHICS</small></h1>
-  <nav id="nav"><a data-tab="op" class="on">Operación</a><a data-tab="design">Diseño</a><a data-tab="anim">Animaciones</a><a data-tab="ticker">Cintilla</a><a data-tab="saved">Titulares guardados</a><a data-tab="tpl">Plantillas</a></nav>
+  <nav id="nav"><a data-tab="op" class="on">Operación</a><a data-tab="design">Diseño</a><a data-tab="ticker">Cintilla</a><a data-tab="saved">Titulares guardados</a><a data-tab="tpl">Plantillas</a></nav>
   <div class="foot"><div id="status" class="status">…</div><label>URL para OBS</label><input id="obsurl" readonly></div></aside>
-<main>
+<main id="main">
   <section class="monitors" id="monitors">
     <div id="pvBox"><div class="pvh"><h2>PREVIEW</h2></div><div class="mon" id="mPrev"></div></div>
     <div><div class="pvh"><h2 class="onair">PROGRAMA · OBS</h2></div><div class="mon air" id="mProg"></div></div>
@@ -20,10 +20,13 @@
       <div class="cols"><div id="fields"></div>
         <div><h3>Animación</h3><div id="animQuick"></div>
         <div class="pvbar"><button data-pv="in" class="go">Entrada</button><button data-pv="out">Salida</button><button data-pv="both">Ambas</button><button data-pv="loop">Repetir</button></div>
-        <p class="hint">Las pruebas solo se ven en PREVIEW; no afectan a lo que está en aire. Más opciones en la pestaña Animaciones.</p></div></div>
+        <p class="hint">Las pruebas solo se ven en PREVIEW; no afectan a lo que está en aire. Más opciones en «Animación avanzada», más abajo.</p></div></div>
       <div class="btns"><button id="bPrev">Previsualizar</button>
         <button id="bUpd" class="go">Actualizar en aire</button><button id="bClr">Limpiar</button></div>
       <p class="hint">Para sacar un gráfico al aire o quitarlo usa el botón «Abrir switches».</p>
+      <details class="adv" id="animMore"><summary>Animación avanzada (retardos, velocidad, por elemento)</summary>
+        <h3>Animación del gráfico</h3><div id="animFull"></div>
+        <h3>Animación por elemento</h3><div id="animEl"></div></details>
     </div>
     <div id="swPanel" hidden>
       <div class="swblock"><div class="swlab prog">PROGRAMA</div><div class="swrow" id="swProg"></div></div>
@@ -34,33 +37,27 @@
   </section>
 
   <section class="panel tab" id="tab-design" hidden>
-    <div class="dtool">
-      <div class="dgrp"><span class="dlab">Gráfico</span><button id="tBlank">Empezar en blanco</button></div>
-      <div class="dgrp"><span class="dlab">Añadir</span><button id="addText">Texto</button><button id="addLogo">Logotipo</button><button id="addImg">Imagen</button><button id="addShape">Forma</button><button id="addTicker">Cintilla</button></div>
-      <div class="dgrp"><span class="dlab">Historial</span><button id="edUndo" title="Ctrl + Z">Deshacer</button><button id="edRedo" title="Ctrl + Y">Rehacer</button></div>
-      <div class="dgrp"><span class="dlab">Copiar y pegar</span><button id="edCopy" title="Ctrl + C">Copiar</button><button id="edPaste" title="Ctrl + V">Pegar</button><span class="hint" id="clipInfo"></span></div>
-    </div>
-    <div class="edwrap"><div class="bigbar" id="bigBar"></div><div class="mon ed" id="mEd"></div></div>
-    <div class="dcols">
-      <div class="dside">
-        <div class="dcard"><h3>Elementos</h3><div id="elList" class="elist"></div></div>
-        <div class="dcard"><h3>Selección y grupos</h3>
-          <p class="hint" id="selInfo"></p><input id="gName" placeholder="Nombre del grupo" hidden>
-          <div class="bgrid2"><button id="gAll">Seleccionar todo</button><button id="gGroup" class="go">Agrupar</button><button id="gUngroup">Desagrupar</button><button id="gDup">Duplicar grupo</button><button id="gLock">Bloquear</button></div></div>
-        <div class="dcard"><h3>Alinear</h3><select id="alignRef" hidden><option value="sel">Respecto a la selección</option><option value="stage">Respecto al escenario</option></select><div class="bgrid3" id="alignBar"></div></div>
-        <details class="dcard"><summary>Guardar como plantilla</summary><div class="row"><input id="tName" placeholder="Nombre de la plantilla"><button id="tSave" class="go">Guardar</button></div></details>
-        <details class="dcard"><summary>Ayuda</summary><p class="hint">Clic en PREVIEW selecciona. Mayús + clic suma elementos. Doble clic entra en un grupo. Arrastra para mover y usa el cuadro de la esquina para cambiar el tamaño (en grupos siempre mantiene proporciones). Flechas del teclado: mover 1 px, con Mayús 10 px. Clic derecho sobre un elemento: copiar, pegar o eliminar. Atajos: Ctrl + C, Ctrl + V, Ctrl + Z (deshacer) y Ctrl + Y (rehacer). El editor muestra siempre el gráfico que estás editando, aunque su switch esté apagado.</p></details>
+    <div class="dleft">
+      <div class="edwrap"><div class="mon ed" id="mEd"></div></div>
+      <div class="dtool">
+        <div class="dgrp"><span class="dlab">Añadir</span><button id="addText">Texto</button><button id="addLogo">Logotipo</button><button id="addImg">Imagen</button><button id="addShape">Forma</button><button id="addTicker">Cintilla</button></div>
+        <div class="dgrp"><span class="dlab">Historial</span><button id="edUndo" title="Ctrl + Z">Deshacer</button><button id="edRedo" title="Ctrl + Y">Rehacer</button></div>
+        <div class="dgrp"><span class="dlab">Copiar y pegar</span><button id="edCopy" title="Ctrl + C">Copiar</button><button id="edPaste" title="Ctrl + V">Pegar</button><span class="hint" id="clipInfo"></span></div>
+        <div class="dgrp"><span class="dlab">Gráfico</span><button id="tBlank">Empezar en blanco</button></div>
       </div>
+    </div>
+    <div class="dright">
+      <div class="dcard"><h3>Elementos</h3><div id="elList" class="elist"></div></div>
       <div id="insp" class="dmain"></div>
+      <div class="dcard"><h3>Selección y grupos</h3>
+        <p class="hint" id="selInfo"></p><input id="gName" placeholder="Nombre del grupo" hidden>
+        <div class="bgrid2"><button id="gAll">Seleccionar todo</button><button id="gGroup" class="go">Agrupar</button><button id="gUngroup">Desagrupar</button><button id="gDup">Duplicar grupo</button><button id="gLock">Bloquear</button></div></div>
+      <div class="dcard"><h3>Alinear</h3><select id="alignRef" hidden><option value="sel">Respecto a la selección</option><option value="stage">Respecto al escenario</option></select><div class="bgrid3" id="alignBar"></div></div>
+      <details class="dcard"><summary>Guardar como plantilla</summary><div class="row"><input id="tName" placeholder="Nombre de la plantilla"><button id="tSave" class="go">Guardar</button></div></details>
+      <details class="dcard"><summary>Ayuda</summary><p class="hint">Clic en el editor selecciona. Mayús + clic suma elementos. Doble clic entra en un grupo. Arrastra para mover y usa el cuadro de la esquina para cambiar el tamaño (en grupos siempre mantiene proporciones). Flechas del teclado: mover 1 px, con Mayús 10 px. Clic derecho (o mantener pulsado en el teléfono) sobre un elemento: copiar, pegar o eliminar. Atajos: Ctrl + C, Ctrl + V, Ctrl + Z (deshacer) y Ctrl + Y (rehacer). El editor muestra siempre el gráfico que estás editando, aunque su switch esté apagado.</p></details>
     </div>
   </section>
 
-  <section class="panel tab" id="tab-anim" hidden>
-    <div class="pvbar"><button data-pv="in" class="go">Entrada</button><button data-pv="out">Salida</button><button data-pv="both">Ambas</button><button data-pv="loop">Repetir</button></div>
-    <p class="hint">Prueba las animaciones en PREVIEW antes de mostrarlas. Con «Repetir» puedes cambiar duración o estilo y ver el resultado al instante. Si no eliges salida, se usa la inversa de la entrada.</p>
-    <h3>Animación del gráfico</h3><div id="animFull"></div>
-    <h3>Animación por elemento</h3><div id="animEl"></div>
-  </section>
 
   <section class="panel tab" id="tab-ticker" hidden><div id="tkInsp" class="dmain"></div></section>
 

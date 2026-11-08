@@ -40,3 +40,9 @@ Sin `databaseURL` funciona en modo local (mismo navegador), solo para pruebas.
 - **Copiar y pegar**: botones Copiar / Pegar, clic derecho sobre el editor (Copiar, Pegar, Eliminar) y atajos Ctrl+C / Ctrl+V. Funciona con un elemento, varios o un grupo, y se puede pegar en otra fuente (cambia de fuente en «Editando» y pega).
 - **Deshacer / Rehacer**: botones y atajos Ctrl+Z / Ctrl+Y (también Ctrl+Mayús+Z). Un arrastre o un rato escribiendo cuenta como un solo paso. Historial independiente por gráfico (hasta 100 pasos).
 - **Textura**: formas y cuadros de texto admiten una imagen de relleno (Cargar textura / Quitar textura) con ajuste: rellenar, ajustar, estirar o mosaico.
+
+## Versión 6 (limpieza y teléfono)
+- **Diseño reordenado**: arriba solo «Editando» y la vista del editor; debajo van Añadir, Historial, Copiar y pegar y «Empezar en blanco». En pantallas grandes el editor queda a la izquierda y la lista de elementos, propiedades, grupos y alinear a la derecha (con su propio desplazamiento), así la página no se hace larga.
+- **Se quitó la pestaña Animaciones**: todo está en Operación. Las opciones básicas siguen a la vista y las avanzadas (retardos, velocidad, por elemento) están en «Animación avanzada», plegada.
+- **Se quitó la barra duplicada** de grupos y alinear que estaba sobre el editor (siguen en el panel derecho).
+- **Teléfono**: menú superior con desplazamiento lateral, monitores lado a lado, columnas en una sola, botones y campos más grandes, y tirador y bordes de selección que se ven y se tocan bien aunque el editor sea pequeño. Mantener pulsado sobre un elemento abre el menú de copiar, pegar y eliminar.

@@ -81,6 +81,7 @@ function setTab(t) {
   tab = t;
   document.querySelectorAll('#nav a').forEach(x => x.classList.toggle('on', x.dataset.tab === t));
   document.querySelectorAll('.tab').forEach(x => x.hidden = x.id !== 'tab-' + t);
+  $('main').classList.toggle('dsg', t === 'design');   // en pantallas grandes Diseño ocupa la pantalla sin desplazar toda la página
   store.setAutoPreview(t !== 'design');   // en Diseño, editar NO enciende el switch de PREVIEW
   hideCtx(); render(store.get());
 }
@@ -229,6 +230,7 @@ function renderAnimEl(box, g) {
   }
   syncAnim(box, a, el);
 }
+$('animMore').ontoggle = () => render(store.get());   // pinta la animación avanzada al abrirla
 const syncLoopBtns = () => document.querySelectorAll('[data-pv="loop"]').forEach(b => b.classList.toggle('on', loopOn));
 async function playTest(mode) { loopOn = false; syncLoopBtns(); prev.stopTest(sel); await prev.test(sel, mode); }
 async function toggleLoop() {
@@ -300,7 +302,7 @@ $('tSave').onclick = () => {
 // ---------- Grupos, bloqueo y alineación ----------
 $('gAll').onclick = () => { const s = S(), ids = elsOf(draftOf()).filter(e => e.on !== false).map(e => e.id); s.grp = null; s.multi = new Set(ids); s.id = ids[ids.length - 1] || null; render(store.get()); };
 $('gGroup').onclick = () => {
-  const ids = [...S().multi]; if (ids.length < 2) { alert('Selecciona al menos 2 elementos (Mayús + clic en la lista o en PREVIEW).'); return; }
+  const ids = [...S().multi]; if (ids.length < 2) { alert('Selecciona al menos 2 elementos (Mayús + clic en la lista o en el editor).'); return; }
   const gid = uid();
   store.mutate(sel, g => {
     g.groups = g.groups || {}; g.groups[gid] = { name: 'Grupo ' + (Object.keys(g.groups).length + 1), locked: false };
@@ -367,8 +369,6 @@ function renderSelUI(g) {
   $('gLock').textContent = lk ? 'Desbloquear' : 'Bloquear';
   const gn = $('gName'); gn.hidden = !s.grp; if (s.grp && document.activeElement !== gn) gn.value = (meta || {}).name || '';
   $('alignRef').hidden = !(t.els.length > 1 && !t.group);
-  bigInfo.textContent = $('selInfo').textContent;
-  bigSync.forEach(([id, b]) => { b.textContent = $(id).textContent; b.disabled = $(id).disabled; });
 }
 
 function setProp(id, p, v) {
@@ -509,7 +509,7 @@ function renderMultiInsp(box, t) {
   if (box.dataset.k !== key) {
     box.dataset.k = key; box.innerHTML = '';
     box.append(mk$('h3', '', t.group ? 'Grupo' : 'Selección múltiple'),
-      mk$('p', 'hint', 'Mover, redimensionar (mantiene proporciones) y alinear actúan sobre toda la composición. Doble clic en PREVIEW (o clic en el elemento de la lista) para editar un elemento suelto.'));
+      mk$('p', 'hint', 'Mover, redimensionar (mantiene proporciones) y alinear actúan sobre toda la composición. Doble clic en el editor (o clic en el elemento de la lista) para editar un elemento suelto.'));
     const gr = mk$('div', 'grid2');
     [['x', 'X (px)'], ['y', 'Y (px)'], ['w', 'Ancho (px)'], ['h', 'Alto (px)']].forEach(([p, l]) => { const w = mk$('div', 'f'), i = mk$('input'); i.type = 'number'; i.dataset.gp = p; i.onchange = () => groupGeo(p, +i.value); w.append(mk$('label', '', l), i); gr.append(w); });
     box.append(gr);
@@ -533,15 +533,17 @@ function outline(i, r) {
   Object.assign(d.style, { display: 'block', left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px' });
 }
 function drawOvl() {
+  ed.el.style.setProperty('--s', (1 / ed.scale()).toFixed(3));   // bordes, etiqueta y tirador conservan un tamaño cómodo en pantalla (también en teléfono)
   const g = draftOf(), t = target(); pool.forEach(d => d.style.display = 'none');
   if (tab !== 'design' || !g || !t.els.length) { ovl.style.display = 'none'; hov.style.display = 'none'; return; }
   const b = bb(t.els), lk = isLocked(g, t), multi = t.els.length > 1;
   ovl.className = 'ovl' + (t.group ? ' grp' : multi ? ' multi' : '') + (lk ? ' lock' : '');
   Object.assign(ovl.style, { display: 'block', left: b.x + 'px', top: b.y + 'px', width: b.w + 'px', height: b.h + 'px' });
   lbl.textContent = (lk ? 'BLOQUEADO · ' : '') + (t.group ? 'GRUPO: ' + ((grpOf(g)[t.group] || {}).name || '') : multi ? t.els.length + ' ELEMENTOS' : (t.els[0].name || t.els[0].type));
-  lbl.style.top = b.y < 70 ? '10px' : '-54px'; lbl.style.left = '6px'; hd.style.display = lk ? 'none' : 'block';
+  lbl.style.top = b.y < 70 ? 'calc(var(--s, 1.6) * 6px)' : 'calc(var(--s, 1.6) * -26px)'; lbl.style.left = '6px'; hd.style.display = lk ? 'none' : 'block';
   if (multi) t.els.forEach((e, i) => outline(i, e));
 }
+new ResizeObserver(() => drawOvl()).observe($('mEd'));
 function hitAt(ev) {   // elemento visible más alto bajo el puntero
   const g = draftOf(); if (!g) return null;
   const r = ed.el.getBoundingClientRect(), k = 1 / ed.scale(), px = (ev.clientX - r.left) * k, py = (ev.clientY - r.top) * k;
@@ -570,7 +572,7 @@ ovl.addEventListener('pointermove', ev => {
   });
 });
 ovl.addEventListener('pointerup', () => { drag = null; });
-ed.el.addEventListener('pointerdown', ev => {   // clic en el PREVIEW selecciona lo que hay debajo
+ed.el.addEventListener('pointerdown', ev => {   // clic en el editor selecciona lo que hay debajo
   if (tab !== 'design' || ev.button !== 0 || ev.target.closest('.ovl')) return;
   const h = hitAt(ev); if (!h) return;
   if (ev.shiftKey || ev.ctrlKey || ev.metaKey) toggleMulti(h.id);
@@ -657,16 +659,6 @@ function renderTpl() {
   mine.forEach(t => addCard($('tplMine'), t, true));
 }
 
-// ---------- Barra del editor (pestaña Diseño) ----------
-const bigSync = [], bigInfo = mk$('span', 'binfo');
-(() => {
-  const bar = $('bigBar'), mkb = (t, f) => { const b = mk$('button', '', t); b.onclick = f; bar.append(b); return b; };
-  bar.append(bigInfo);
-  ['gAll', 'gGroup', 'gUngroup', 'gDup', 'gLock'].forEach(id => bigSync.push([id, mkb('', () => $(id).click())]));
-  bar.append(mk$('span', 'bsep'));
-  ALIGNS.forEach(([m, t]) => mkb(t, () => align(m))); mkb('Distribuir H', () => distribute('h')); mkb('Distribuir V', () => distribute('v'));
-})();
-
 // ---------- Deshacer / rehacer ----------
 const doUndo = () => { store.undo(sel); $('fields').dataset.k = ''; };
 const doRedo = () => { store.redo(sel); $('fields').dataset.k = ''; };
@@ -740,12 +732,14 @@ function render(s) {
   fixSel(g); buildLive(s);
   ed.apply(tab === 'design' ? { [sel]: { ...g, visible: true } } : {});   // el editor siempre muestra lo que editas, esté el switch encendido o no
   if (tab === 'design') syncEditTools();
-  if (tab === 'op') { syncContent(g); renderAnim($('animQuick'), g, false); }
+  if (tab === 'op') {
+    syncContent(g); renderAnim($('animQuick'), g, false);
+    if ($('animMore').open) { renderAnim($('animFull'), g, true); renderAnimEl($('animEl'), g); }   // la animación avanzada solo se pinta si está abierta
+  }
   if (tab === 'design') {
     renderList(g); renderSelUI(g);
     const t = target(); if (t.els.length > 1) renderMultiInsp($('insp'), t); else renderInsp($('insp'), curEl(), 'design');
   }
-  if (tab === 'anim') { renderAnim($('animFull'), g, true); renderAnimEl($('animEl'), g); }
   if (tab === 'ticker') renderTickerTab(g);
   if (tab === 'saved') renderSaved();
   if (tab === 'tpl') renderTpl();
