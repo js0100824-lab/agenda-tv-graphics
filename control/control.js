@@ -623,17 +623,53 @@ function pickHit(h, multi) {   // selecciona lo tocado; si es de otro gráfico a
   if (multi && same) toggleMulti(h.e.id);
   else if (h.e.group && grpOf(draftOf())[h.e.group]) selectGroup(h.e.group); else selectOne(h.e.id);
 }
+// ---------- Imán: al mover o cambiar el tamaño, el elemento se pega a los bordes y centros de los demás y del escenario ----------
+const gV = mk$('div', 'guide v'), gH = mk$('div', 'guide h'); ed.el.append(gV, gH);
+function showGuides(x, y) {
+  gV.style.display = x == null ? 'none' : 'block'; if (x != null) gV.style.left = x + 'px';
+  gH.style.display = y == null ? 'none' : 'block'; if (y != null) gH.style.top = y + 'px';
+}
+function snapLines(skip) {   // líneas a las que se pega: bordes y centros de los elementos visibles de los gráficos abiertos + el escenario
+  const xs = new Set([0, 960, 1920]), ys = new Set([0, 540, 1080]), d = store.get().draft;
+  open.forEach(id => elsOf(d[id]).forEach(e => {
+    if (e.on === false || skip.has(e.id)) return;
+    xs.add(e.x); xs.add(e.x + e.w); xs.add(e.x + e.w / 2); ys.add(e.y); ys.add(e.y + e.h); ys.add(e.y + e.h / 2);
+  }));
+  return { xs: [...xs], ys: [...ys] };
+}
+function snapAxis(vals, lines, th) {   // la línea más cercana (dentro del umbral) a alguno de los valores: { d: desplazamiento, line }
+  let best = null;
+  vals.forEach(v => lines.forEach(l => { const d = l - v; if (Math.abs(d) <= th && (!best || Math.abs(d) < Math.abs(best.d))) best = { d, line: l }; }));
+  return best;
+}
+const snapOn = ev => $('snapOn').checked && !ev.altKey;   // Alt desactiva el imán mientras se arrastra
+
 let drag = null;
 ovl.addEventListener('pointerdown', ev => {
   if (ev.button !== 0) return;
   const g = draftOf(), t = target(); if (!t.els.length || isLocked(g, t)) return;
   const box = bb(t.els);   // cx, cy: esquina que se ve en pantalla (el tirador se queda dentro del escenario aunque el elemento se salga)
-  drag = { rs: ev.target.classList.contains('hd'), sx: ev.clientX, sy: ev.clientY, snap: t.els.map(clone), box, cx: Math.min(box.x + box.w, 1920), cy: Math.min(box.y + box.h, 1080), single: !t.group && t.els.length === 1 };
+  drag = { rs: ev.target.classList.contains('hd'), sx: ev.clientX, sy: ev.clientY, snap: t.els.map(clone), box, cx: Math.min(box.x + box.w, 1920), cy: Math.min(box.y + box.h, 1080), single: !t.group && t.els.length === 1, lines: snapLines(new Set(t.els.map(e => e.id))) };
   ovl.setPointerCapture(ev.pointerId); ev.preventDefault();
 });
 ovl.addEventListener('pointermove', ev => {
   if (!drag) return;
-  const k = 1 / ed.scale(), dx = (ev.clientX - drag.sx) * k, dy = (ev.clientY - drag.sy) * k;
+  const k = 1 / ed.scale(); let dx = (ev.clientX - drag.sx) * k, dy = (ev.clientY - drag.sy) * k;
+  const th = 8 * k, on = snapOn(ev), B = drag.box; let gx = null, gy = null;   // umbral: 8 px de pantalla
+  if (on && !drag.rs) {   // mover: se pegan el borde izquierdo, el centro o el borde derecho (y lo mismo en vertical)
+    const nx = B.x + dx, ny = B.y + dy, a = snapAxis([nx, nx + B.w / 2, nx + B.w], drag.lines.xs, th), b = snapAxis([ny, ny + B.h / 2, ny + B.h], drag.lines.ys, th);
+    if (a) { dx += a.d; gx = a.line; } if (b) { dy += b.d; gy = b.line; }
+  }
+  if (on && drag.rs) {   // cambiar tamaño: la esquina se pega a las líneas; con proporciones fijas se pega por el eje más cercano
+    const o = drag.snap[0], lockAR = !drag.single || (o.type === 'image' && o.lock !== false) || ev.shiftKey;
+    let rx = drag.cx + dx, ry = drag.cy + dy, a, b;
+    if (drag.single) { a = snapAxis([rx], drag.lines.xs, th); b = snapAxis([ry], drag.lines.ys, th); }
+    else { const kk0 = Math.max(.05, (rx - B.x) / B.w); a = snapAxis([rx], drag.lines.xs, th); b = snapAxis([B.y + B.h * kk0], drag.lines.ys, th); }
+    if (lockAR && a && b) { if (Math.abs(a.d) <= Math.abs(b.d)) b = null; else a = null; }
+    if (a) { dx += a.d; gx = a.line; }
+    if (b) { gy = b.line; if (lockAR) { const kk = Math.max(.05, (b.line - B.y) / B.h); dx = B.x + B.w * kk - drag.cx; if (drag.single) { const nw = (b.line - o.y) * o.w / o.h; dx = o.x + nw - drag.cx; } } else dy += b.d; }
+  }
+  showGuides(gx, gy);
   store.mutate(sel, g => {   // todo se calcula desde el estado inicial: las posiciones relativas no se pierden
     if (!drag.rs) { drag.snap.forEach(o => { const e = byId(g, o.id); if (e) { e.x = Math.round(o.x + dx); e.y = Math.round(o.y + dy); } }); return; }
     if (drag.single) {
@@ -646,7 +682,8 @@ ovl.addEventListener('pointermove', ev => {
     drag.snap.forEach(o => { const e = byId(g, o.id); if (e) scaleEl(e, o, drag.box.x, drag.box.y, kk); });
   });
 });
-ovl.addEventListener('pointerup', () => { drag = null; });
+const endDrag = () => { drag = null; showGuides(null, null); };
+ovl.addEventListener('pointerup', endDrag); ovl.addEventListener('pointercancel', endDrag);
 ed.el.addEventListener('pointerdown', ev => {   // clic en el editor selecciona lo que hay debajo
   if (tab !== 'design' || ev.button !== 0 || ev.target.closest('.ovl')) return;
   const h = hitAt(ev), add = ev.shiftKey || ev.ctrlKey || ev.metaKey;
