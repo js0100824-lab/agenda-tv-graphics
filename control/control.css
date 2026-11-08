@@ -204,3 +204,12 @@ main.dsg .editbar{position:sticky;top:0;z-index:30;background:#111418;padding:6p
 .swmgr .hint{margin:0 0 4px}
 
 .mon.ed .stage.tight{clip-path:inset(0)}
+
+/* ---- Orden de los switches arrastrando, nombres editables y botón Renombrar ---- */
+.renb{padding:7px 12px;border:0;border-radius:4px;background:#2a3340;color:#fff;cursor:pointer;font-weight:600}
+.mlist{display:flex;flex-direction:column;gap:6px}
+.swmgr .mrow{cursor:grab;user-select:none;-webkit-user-select:none;transition:transform .14s ease,box-shadow .14s}
+.swmgr .mrow .mname{flex:1;min-width:0;cursor:text;user-select:text;-webkit-user-select:text}
+.swmgr .mrow .grip{flex:none;width:16px;height:24px;touch-action:none;cursor:grab;background:radial-gradient(circle,#8b97a8 1.6px,transparent 2px) 0 0/8px 8px}
+.swmgr .mrow.dragging{transition:none;cursor:grabbing;position:relative;z-index:5;border-color:#38bdf8;background:#0b2a44;box-shadow:0 8px 20px rgba(0,0,0,.55)}
+.swmgr .mlist.sorting{cursor:grabbing}

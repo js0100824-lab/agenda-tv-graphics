@@ -11,6 +11,12 @@ export const SLOTS = {
   nameplate: { name: 'Nombre / cargo',    tpl: 'nameplate', layer: 3 }
 };
 
+// Nombres por defecto de los gráficos integrados; el usuario puede renombrarlos (se guarda en /slotNames).
+export const DEFAULT_NAMES = Object.fromEntries(Object.entries(SLOTS).map(([k, v]) => [k, v.name]));
+export function setNames(map) {
+  for (const k of Object.keys(SLOTS)) if (!SLOTS[k].custom) SLOTS[k].name = (map && map[k]) || DEFAULT_NAMES[k] || SLOTS[k].name;
+}
+
 // Orden de los botones de los switches (se guarda en /slotOrder). Las claves de SLOTS siguen ese orden en todo el panel.
 let ORDER = [];
 export function applyOrder(order) {
@@ -53,6 +59,8 @@ export const newText   = () => T(uid(), 'Texto nuevo', '', 200, 400, 900, 120, '
 export const newImage  = () => I(uid(), 'Imagen', '', 100, 100, 300, 200);
 export const newLogo   = () => I(uid(), 'Logotipo', 'logo', 100, 100, 240, 160);
 export const newShape  = () => S(uid(), 'Forma', 200, 300, 400, 100, '#1565ff');
+export const newClock  = () => ({ id: uid(), type: 'clock', name: 'Reloj', role: 'clock', x: 1500, y: 40, w: 380, h: 110, fmt: 'hms', h12: false,
+  font: 'Segoe UI', size: 64, minSize: 16, weight: 700, color: '#ffffff', bg: '#0b1f4d', align: 'center', valign: 'middle', padX: 24, lh: 1.1, autofit: true, on: true });
 export const newTicker = () => K(uid(), 'Cintilla', 0, 980, 1920, 100);
 
 // ---------- Biblioteca de plantillas (estilos de canal informativo) ----------
@@ -158,10 +166,11 @@ function fitText(n, t, e) {   // reduce el tamaño hasta que el texto cabe en su
   const max = Math.max(6, num(e.size, 40)), min = Math.min(max, Math.max(6, num(e.minSize, 12)));
   t.style.fontSize = max + 'px';
   if (e.autofit === false) return;
-  const H = n.clientHeight;
-  if (!H || t.scrollHeight <= H) return;
+  const H = n.clientHeight, W = n.clientWidth, one = e.type === 'clock';   // el reloj va en una sola línea: también debe caber a lo ancho
+  const fits = () => t.scrollHeight <= H && (!one || t.scrollWidth <= W);
+  if (!H || fits()) return;
   let lo = min, hi = max;
-  while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); t.style.fontSize = mid + 'px'; if (t.scrollHeight <= H) lo = mid; else hi = mid - 1; }
+  while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); t.style.fontSize = mid + 'px'; if (fits()) lo = mid; else hi = mid - 1; }
   t.style.fontSize = lo + 'px';
 }
 
@@ -189,6 +198,31 @@ function mountTicker(n, tr, vp, e) {   // cinta continua sin huecos: dos grupos 
   if (n._paused) n._anim.pause();
 }
 
+// ---------- Reloj: hora de República Dominicana (America/Santo_Domingo, UTC-4 todo el año) ----------
+const TZ = 'America/Santo_Domingo', DTF = {};
+function drTime(fmt, h12) {
+  const k = h12 ? 12 : 24;
+  if (!DTF[k]) DTF[k] = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hour: h12 ? 'numeric' : '2-digit', minute: '2-digit', second: '2-digit', hourCycle: h12 ? 'h12' : 'h23' });
+  const p = {}; DTF[k].formatToParts(new Date()).forEach(x => { p[x.type] = x.value; });
+  let s = `${p.hour}:${p.minute}`; if (fmt === 'hms') s += ':' + p.second;
+  if (h12) s += ' ' + String(p.dayPeriod || '').replace(/\./g, '').toUpperCase();
+  return s;
+}
+const CLOCKS = new Set(); let clockTimer = 0;
+function paintClock(n) {
+  const s = drTime(n._fmt, n._h12); if (s === n._shown) return;
+  const resize = (n._shown || '').length !== s.length; n._shown = s; n._t.textContent = s; if (resize && n._fit) n._fit();
+}
+function tickClocks() {
+  const now = Date.now();
+  for (const n of CLOCKS) {
+    if (!n.isConnected) { if (n._seen || now - n._born > 5000) CLOCKS.delete(n); continue; }   // los relojes retirados de la pantalla dejan de actualizarse
+    n._seen = true; paintClock(n);
+  }
+  if (!CLOCKS.size) { clearInterval(clockTimer); clockTimer = 0; }
+}
+function registerClock(n) { n._born = Date.now(); CLOCKS.add(n); paintClock(n); if (!clockTimer) clockTimer = setInterval(tickClocks, 250); }
+
 // Textura: una imagen que rellena la forma o el cuadro de texto (la imagen sigue el redondeo del elemento)
 function applyTex(s, e) {
   if (!e.tex) return;
@@ -202,13 +236,15 @@ export function buildElement(e, opts = {}) {
   const n = div(`el ${e.type}`); n.dataset.id = e.id;
   const s = n.style;
   s.left = num(e.x) + 'px'; s.top = num(e.y) + 'px'; s.width = Math.max(1, num(e.w, 100)) + 'px'; s.height = Math.max(1, num(e.h, 50)) + 'px';
-  if (e.type === 'text') {
+  if (e.type === 'text' || e.type === 'clock') {
     s.background = e.bg || 'transparent'; s.color = e.color || '#fff'; applyTex(s, e);
     s.alignItems = { top: 'flex-start', middle: 'center', bottom: 'flex-end' }[e.valign] || 'center';
-    const t = div('t', e.text || '');
+    const clock = e.type === 'clock', t = div('t', clock ? '' : (e.text || ''));
     Object.assign(t.style, { padding: `4px ${num(e.padX, 24)}px`, textAlign: e.align || 'left', fontFamily: ff(e.font),
       fontWeight: e.weight || 700, lineHeight: num(e.lh, 1.1), textTransform: e.upper ? 'uppercase' : 'none' });
+    if (clock) { t.style.whiteSpace = 'nowrap'; t.style.fontVariantNumeric = 'tabular-nums'; }
     n.append(t); n._fit = () => fitText(n, t, e);
+    if (clock) { n._t = t; n._fmt = e.fmt === 'hm' ? 'hm' : 'hms'; n._h12 = !!e.h12; registerClock(n); }
   } else if (e.type === 'image') {
     s.background = e.bg || 'transparent'; s.borderRadius = num(e.radius) + 'px'; s.opacity = num(e.opacity, 1);
     if (e.src) { const im = new Image(); im.src = e.src; im.draggable = false; im.style.objectFit = e.fit || 'contain'; n.append(im); }

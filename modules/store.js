@@ -1,9 +1,9 @@
 // Estado central: /draft (lo que editas y ves en PREVIEW) y /program (lo que ve OBS).
 // Además: /headlines (titulares guardados) y /templates (plantillas personalizadas).
 import * as db from './firebase.js';
-import { SLOTS, newGraphic, arr, uid, setCustomSlots, applyOrder } from './templates.js';
+import { SLOTS, DEFAULT_NAMES, newGraphic, arr, uid, setCustomSlots, applyOrder, setNames } from './templates.js';
 
-const state = { draft: {}, program: {}, headlines: {}, templates: {}, slots: {} };
+const state = { draft: {}, program: {}, headlines: {}, templates: {}, slots: {}, names: {}, programs: {} };
 const subs = new Set();
 const emit = () => subs.forEach(f => f(state));
 export const subscribe = f => { subs.add(f); f(state); };
@@ -29,6 +29,17 @@ function fixLib(v) {
   return r;
 }
 
+function fixProgs(v) {   // programas guardados: cada uno trae todos sus gráficos
+  const r = {};
+  for (const k in (v || {})) {
+    const p = v[k]; if (!p) continue;
+    p.slots = p.slots || {}; p.names = p.names || {}; p.order = arr(p.order);
+    const gs = {}; for (const id in (p.graphics || {})) { const g = p.graphics[id]; if (g) { g.elements = fixEls(g.elements); gs[id] = g; } }
+    p.graphics = gs; r[k] = p;
+  }
+  return r;
+}
+
 export async function init() {
   await db.connect();
   db.watch('slots', v => {   // gráficos adicionales (además de los tres integrados)
@@ -36,6 +47,8 @@ export async function init() {
     for (const id in SLOTS) if (!state.draft[id]) state.draft[id] = newGraphic(id);
     emit();
   });
+  db.watch('slotNames', v => { state.names = v || {}; setNames(state.names); emit(); });   // nombres personalizados de los gráficos integrados
+  db.watch('programs', v => { state.programs = fixProgs(v); emit(); });
   db.watch('slotOrder', v => { applyOrder(v); emit(); });   // orden de los botones de los switches
   db.watch('draft', v => {   // no pisar con datos remotos lo que se está editando y aún no se ha guardado
     const n = fixGraphics(v, true);
@@ -134,8 +147,10 @@ export function moveSlot(id, to) {   // cambia la posición de un gráfico en lo
   to = Math.max(0, Math.min(ids.length - 1, to)); if (from === to) return;
   ids.splice(from, 1); ids.splice(to, 0, id); applyOrder(ids); emit(); return db.set('slotOrder', ids);
 }
-export function renameSlot(id, name) {
-  if (!state.slots[id]) return; state.slots[id].name = name; setCustomSlots(state.slots); emit(); return db.set(`slots/${id}/name`, name);
+export function renameSlot(id, name) {   // cualquier gráfico se puede renombrar (los integrados guardan su nombre en /slotNames)
+  name = String(name || '').trim(); if (!name || !SLOTS[id]) return;
+  if (state.slots[id]) { state.slots[id].name = name; setCustomSlots(state.slots); emit(); return db.set(`slots/${id}/name`, name); }
+  state.names[id] = name; setNames(state.names); emit(); return db.set(`slotNames/${id}`, name);
 }
 export async function removeSlot(id) {
   if (!SLOTS[id] || !SLOTS[id].custom) return;
@@ -156,3 +171,45 @@ export const saveHeadline = rec => putLib('headlines', state.headlines, rec);
 export const deleteHeadline = id => delLib('headlines', state.headlines, id);
 export const saveTemplate = rec => putLib('templates', state.templates, rec);
 export const deleteTemplate = id => delLib('templates', state.templates, id);
+
+// ---------- Programas: un conjunto completo de gráficos (diseños, textos, logos, cintilla, nombres y orden) ----------
+export const programs = () => byTs(state.programs);
+export const progNames = p => (p.order.length ? p.order : Object.keys(p.graphics)).filter(id => p.graphics[id])
+  .map(id => (p.slots[id] && p.slots[id].name) || p.names[id] || DEFAULT_NAMES[id] || 'Gráfico');
+export function saveProgram(name, id) {   // guarda (o reemplaza, si se da id) todos los gráficos actuales con ese nombre
+  const graphics = {}, slots = {}, names = {};
+  for (const k in SLOTS) { const g = clone(state.draft[k]); delete g.visible; graphics[k] = g; }
+  for (const k in state.slots) if (SLOTS[k]) slots[k] = clone(state.slots[k]);
+  for (const k in state.names) if (SLOTS[k] && !SLOTS[k].custom) names[k] = state.names[k];
+  return putLib('programs', state.programs, { id, name, order: Object.keys(SLOTS), slots, names, graphics });
+}
+export const deleteProgram = id => delLib('programs', state.programs, id);
+export function renameProgram(id, name) {
+  if (!state.programs[id] || !name) return; state.programs[id].name = name; emit(); return db.set(`programs/${id}/name`, name);
+}
+export function duplicateProgram(id) {
+  const p = state.programs[id]; if (!p) return;
+  const c = clone(p); delete c.id; c.name = p.name + ' (copia)'; return putLib('programs', state.programs, c);
+}
+export async function openProgram(id) {   // sustituye TODOS los gráficos actuales por los del programa
+  const p = state.programs[id]; if (!p) return false;
+  const slots = {}; for (const k in p.slots) if (p.slots[k]) slots[k] = clone(p.slots[k]);
+  for (const k in state.program) {   // lo que estaba al aire sale; los gráficos que ya no existen se retiran
+    const pg = state.program[k]; if (!pg) continue;
+    if (SLOTS[k] && (!SLOTS[k].custom || slots[k])) { if (pg.visible) { pg.visible = false; db.set(`program/${k}/visible`, false); } }
+    else { delete state.program[k]; db.set(`program/${k}`, null); }
+  }
+  for (const k in timers) { clearTimeout(timers[k]); pending[k] = false; }
+  for (const k in hist) delete hist[k];
+  state.slots = slots; state.names = clone(p.names); setNames(state.names); setCustomSlots(slots); applyOrder(p.order);
+  const draft = {};
+  for (const k in SLOTS) {
+    const src = p.graphics[k];
+    draft[k] = src ? { ...clone(src), id: k, v: 2, visible: false } : newGraphic(k);
+    draft[k].elements = fixEls(draft[k].elements);
+  }
+  state.draft = draft; markNext = true; emit();
+  await Promise.all([db.set('slots', Object.keys(slots).length ? slots : null), db.set('slotNames', Object.keys(state.names).length ? state.names : null),
+    db.set('slotOrder', Object.keys(SLOTS)), db.set('draft', draft)]);
+  return true;
+}

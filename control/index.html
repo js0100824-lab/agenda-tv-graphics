@@ -4,14 +4,14 @@
 <link rel="stylesheet" href="../assets/gfx.css"><link rel="stylesheet" href="control.css"></head>
 <body>
 <aside><h1>AGENDA TV<small>GRAPHICS</small></h1>
-  <nav id="nav"><a data-tab="op" class="on">Operación</a><a data-tab="design">Diseño</a><a data-tab="ticker">Cintilla</a><a data-tab="saved">Titulares guardados</a><a data-tab="tpl">Plantillas</a></nav>
+  <nav id="nav"><a data-tab="op" class="on">Operación</a><a data-tab="prog">Programas</a><a data-tab="design">Diseño</a><a data-tab="ticker">Cintilla</a><a data-tab="saved">Titulares guardados</a><a data-tab="tpl">Plantillas</a></nav>
   <div class="foot"><div id="status" class="status">…</div><label>URL para OBS</label><input id="obsurl" readonly></div></aside>
 <main id="main">
   <section class="monitors" id="monitors">
     <div id="pvBox"><div class="pvh"><h2>PREVIEW</h2></div><div class="mon" id="mPrev"></div></div>
     <div><div class="pvh"><h2 class="onair">PROGRAMA · OBS</h2></div><div class="mon air" id="mProg"></div></div>
   </section>
-  <section class="editbar" id="editbar"><span class="dlab">Editando</span><div class="seg" id="editBtns"></div><span class="hint" id="edHint" hidden>Toca otro gráfico para abrirlo junto al actual; toca el activo para cerrarlo.</span></section>
+  <section class="editbar" id="editbar"><span class="dlab">Editando</span><div class="seg" id="editBtns"></div><button id="edRename" class="renb" title="Cambiar el nombre del gráfico que estás editando">Renombrar</button><span class="hint" id="edHint" hidden>Toca otro gráfico para abrirlo junto al actual; toca el activo para cerrarlo.</span></section>
   <section class="livebar" id="liveBar" hidden></section>
 
   <section class="panel tab" id="tab-op">
@@ -40,7 +40,7 @@
     <div class="dstick">
       <div class="edwrap"><div class="mon ed" id="mEd"></div></div>
       <div class="dtool">
-        <div class="dgrp"><span class="dlab">Añadir</span><button id="addText">Texto</button><button id="addLogo">Logotipo</button><button id="addImg">Imagen</button><button id="addShape">Forma</button><button id="addTicker">Cintilla</button></div>
+        <div class="dgrp"><span class="dlab">Añadir</span><button id="addText">Texto</button><button id="addClock">Reloj</button><button id="addLogo">Logotipo</button><button id="addImg">Imagen</button><button id="addShape">Forma</button><button id="addTicker">Cintilla</button></div>
         <div class="dgrp"><span class="dlab">Historial</span><button id="edUndo" title="Ctrl + Z">Deshacer</button><button id="edRedo" title="Ctrl + Y">Rehacer</button></div>
         <div class="dgrp"><span class="dlab">Gráfico</span><button id="tBlank">Empezar en blanco</button></div>
       </div>
@@ -57,6 +57,14 @@
     </div>
   </section>
 
+
+  <section class="panel tab" id="tab-prog" hidden>
+    <h3>Guardar los gráficos actuales como programa</h3>
+    <div class="saveRow"><input id="pName" placeholder="Nombre del programa (por ejemplo: Noticiero de la noche)"><button id="pSave" class="go">Guardar programa</button></div>
+    <p class="hint">Se guardan todos los gráficos de una vez: diseños, textos, logotipos, cintillas, relojes, nombres y orden de los switches. Lo que esté al aire no se guarda ni se toca hasta que abras otro programa.</p>
+    <h3>PROGRAMAS GUARDADOS</h3>
+    <input id="pSearch" placeholder="Buscar programas…"><div id="pList" class="hlist"></div>
+  </section>
 
   <section class="panel tab" id="tab-ticker" hidden><div id="tkInsp" class="dmain"></div></section>
 

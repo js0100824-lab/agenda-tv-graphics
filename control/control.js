@@ -1,7 +1,7 @@
 import * as store from '../modules/store.js';
 import * as db from '../modules/firebase.js';
 import { createStage } from '../modules/stage.js';
-import { SLOTS, TEMPLATES, TEMPLATE_LIST, FONTS, arr, uid, layerOf, instantiate, newText, newImage, newLogo, newShape, newTicker } from '../modules/templates.js';
+import { SLOTS, TEMPLATES, TEMPLATE_LIST, FONTS, arr, uid, layerOf, instantiate, newText, newImage, newLogo, newShape, newTicker, newClock } from '../modules/templates.js';
 import { CATALOG, normAnim, outKey } from '../modules/animations.js';
 
 const $ = id => document.getElementById(id);
@@ -137,17 +137,45 @@ function buildAirpad(s) {
     });
   });
   const mg = $('swMgr'); mg.innerHTML = ''; mg.className = 'swmgr';
-  mg.append(mk$('p', 'hint', 'Para cambiar el orden de los botones, arrástralos o usa «Antes» y «Después». El orden se guarda y se aplica también en «Editando».'));
-  ids.forEach((id, i) => {
-    const r = mk$('div', 'mrow'), add = (t, f, dis) => { const x = mk$('button', t === 'Eliminar' ? 'danger' : '', t); x.disabled = !!dis; x.onclick = f; r.append(x); };
-    r.append(mk$('span', '', SLOTS[id].name));
-    add('Antes', () => store.moveSlot(id, i - 1), i === 0); add('Después', () => store.moveSlot(id, i + 1), i === ids.length - 1);
-    if (!SLOTS[id].custom) { mg.append(r); return; }
-    add('Renombrar', () => { const n = (prompt('Nuevo nombre:', SLOTS[id].name) || '').trim(); if (n) store.renameSlot(id, n); });
-    add('Eliminar', () => { if (confirm(`¿Eliminar el gráfico «${SLOTS[id].name}»? Se borra también su diseño.`)) { if (sel === id) selectSlot('headline'); store.removeSlot(id); } });
-    mg.append(r);
+  mg.append(mk$('p', 'hint', 'Para cambiar el orden, mantén pulsado un gráfico y arrástralo hacia arriba o hacia abajo (en el teléfono, desde las rayitas de la izquierda). Para cambiar su nombre, escribe en su cuadro y pulsa Enter. El orden se guarda y se aplica también en «Editando».'));
+  const list = mk$('div', 'mlist'); mg.append(list);
+  ids.forEach(id => {
+    const r = mk$('div', 'mrow'), inp = mk$('input', 'mname');
+    inp.value = SLOTS[id].name; inp.maxLength = 60; inp.title = 'Editar el nombre del gráfico';
+    inp.onchange = () => { const n = inp.value.trim(); if (n && n !== SLOTS[id].name) store.renameSlot(id, n); else inp.value = SLOTS[id].name; };
+    inp.onkeydown = e => { if (e.key === 'Enter') inp.blur(); };
+    r.append(mk$('div', 'grip'), inp);
+    if (SLOTS[id].custom) {
+      const x = mk$('button', 'danger', 'Eliminar');
+      x.onclick = () => { if (confirm(`¿Eliminar el gráfico «${SLOTS[id].name}»? Se borra también su diseño.`)) { if (sel === id) selectSlot('headline'); store.removeSlot(id); } };
+      r.append(x);
+    }
+    list.append(r);
   });
+  sortRows(list, ids, (id, to) => store.moveSlot(id, to));
 }
+// Reordenar filas arrastrando (ratón o dedo): la fila sigue al puntero y las demás se apartan; al soltar se guarda el nuevo orden.
+function sortRows(list, ids, onMove) {
+  const rows = [...list.children];
+  rows.forEach((r, i) => r.addEventListener('pointerdown', ev => {
+    if (ev.button !== 0 || ev.target.closest('input,button,select')) return;
+    if (ev.pointerType === 'touch' && !ev.target.closest('.grip')) return;   // en pantalla táctil solo se arrastra desde las rayitas, para poder desplazar la página
+    const rects = rows.map(x => x.getBoundingClientRect()), pitch = rows.length > 1 ? rects[1].top - rects[0].top : rects[0].height, y0 = ev.clientY;
+    let to = i; r.setPointerCapture(ev.pointerId); r.classList.add('dragging'); list.classList.add('sorting'); ev.preventDefault();
+    const move = e => {
+      const dy = Math.max(-i * pitch, Math.min((rows.length - 1 - i) * pitch, e.clientY - y0));
+      r.style.transform = `translateY(${dy}px)`; to = Math.max(0, Math.min(rows.length - 1, Math.round(i + dy / pitch)));
+      rows.forEach((x, j) => { if (x !== r) x.style.transform = i < to && j > i && j <= to ? `translateY(${-pitch}px)` : i > to && j < i && j >= to ? `translateY(${pitch}px)` : ''; });
+    };
+    const up = () => {
+      r.removeEventListener('pointermove', move); r.removeEventListener('pointerup', up); r.removeEventListener('pointercancel', up);
+      rows.forEach(x => { x.style.transform = ''; }); r.classList.remove('dragging'); list.classList.remove('sorting');
+      if (to !== i) onMove(ids[i], to);
+    };
+    r.addEventListener('pointermove', move); r.addEventListener('pointerup', up); r.addEventListener('pointercancel', up);
+  }));
+}
+$('edRename').onclick = () => { const n = (prompt('Nuevo nombre del gráfico:', SLOTS[sel].name) || '').trim(); if (n) store.renameSlot(sel, n); };
 $('slotAdd').onclick = () => {
   const name = (prompt('Nombre del nuevo gráfico (por ejemplo: Marcador, Reloj, Logo):') || '').trim(); if (!name) return;
   selectSlot(store.addSlot(name));   // nuevo gráfico en blanco: aparece en los switches; se diseña en Diseño o Plantillas
@@ -289,7 +317,7 @@ function pickImage(cb, maxSide = 800, maxLen = 3e6) {
 const applyImage = (id, r, resize) => edit(id, e => { e.src = r.src; e.ar = r.ar; if (resize) e.h = Math.max(10, Math.round(e.w / r.ar)); });
 
 // ---------- Pestaña Diseño: lista, altas y propiedades ----------
-const TYPE = { text: 'Texto', image: 'Imagen', shape: 'Forma', ticker: 'Cintilla' };
+const TYPE = { text: 'Texto', clock: 'Reloj', image: 'Imagen', shape: 'Forma', ticker: 'Cintilla' };
 function renderList(g) {
   const box = $('elList'), els = elsOf(g), s = S(), groups = grpOf(g);
   const key = [sel, s.id, s.grp, [...s.multi].join(), els.map(e => [e.id, e.name, e.on === false, e.group, e.locked].join(':')).join(),
@@ -313,13 +341,13 @@ function renderList(g) {
 }
 $('elList').onclick = ev => { if (ev.target === $('elList')) deselect(); };   // clic en el espacio vacío de la lista
 const addEl = e => { store.mutate(sel, g => g.elements.push(e)); selectOne(e.id); };
-const ADDERS = { text: newText, logo: newLogo, image: newImage, shape: newShape, ticker: newTicker };
+const ADDERS = { text: newText, clock: newClock, logo: newLogo, image: newImage, shape: newShape, ticker: newTicker };
 function addAt(kind, pt) {   // añade un elemento; con pt (clic derecho) queda centrado en ese punto
   const e = ADDERS[kind]();
   if (pt && kind !== 'ticker') { e.x = Math.round(Math.max(0, Math.min(1920 - e.w, pt.x - e.w / 2))); e.y = Math.round(Math.max(0, Math.min(1080 - e.h, pt.y - e.h / 2))); }
   addEl(e); if (kind === 'logo' || kind === 'image') pickImage(r => applyImage(e.id, r, true));
 }
-$('addText').onclick = () => addAt('text'); $('addShape').onclick = () => addAt('shape'); $('addTicker').onclick = () => addAt('ticker');
+$('addText').onclick = () => addAt('text'); $('addClock').onclick = () => addAt('clock'); $('addShape').onclick = () => addAt('shape'); $('addTicker').onclick = () => addAt('ticker');
 $('addLogo').onclick = () => addAt('logo'); $('addImg').onclick = () => addAt('image');
 $('tSave').onclick = () => {
   const name = $('tName').value.trim(), g = draftOf(); if (!name) { alert('Escribe un nombre para la plantilla.'); return; }
@@ -428,6 +456,12 @@ function mk(spec, id) {
 const GEO = [['x', 'X (px)', 'num'], ['y', 'Y (px)', 'num'], ['w', 'Ancho (px)', 'num', { min: 10 }], ['h', 'Alto (px)', 'num', { min: 10 }]];
 const WEIGHTS = [[400, 'Normal'], [600, 'Seminegrita'], [700, 'Negrita'], [800, 'Extranegrita']], FONTSEL = FONTS.map(f => [f, f]);
 const SECTIONS = {
+  clock: [['Reloj (hora de República Dominicana)', [['fmt', 'Mostrar', 'select', [['hm', 'Hora y minutos'], ['hms', 'Hora, minutos y segundos']]], ['h12', 'Formato de 12 horas (AM / PM)', 'check']]],
+    ['Tipografía', [['font', 'Tipografía', 'select', FONTSEL], ['size', 'Tamaño máximo (px)', 'num', { min: 6, max: 400 }], ['minSize', 'Tamaño mínimo (px)', 'num', { min: 6, max: 400 }],
+      ['weight', 'Grosor', 'select', WEIGHTS], ['autofit', 'Ajuste automático al cuadro', 'check']]],
+    ['Alineación y márgenes', [['align', 'Alineación', 'select', [['left', 'Izquierda'], ['center', 'Centro'], ['right', 'Derecha']]],
+      ['valign', 'Alineación vertical', 'select', [['top', 'Arriba'], ['middle', 'Centro'], ['bottom', 'Abajo']]], ['padX', 'Margen lateral (px)', 'num', { min: 0 }]]],
+    ['Colores', [['color', 'Color del texto', 'color'], ['bg', 'Color de fondo', 'coloropt']]]],
   text: [['Contenido', [['text', 'Texto', 'area']]],
     ['Tipografía', [['font', 'Tipografía', 'select', FONTSEL], ['size', 'Tamaño máximo (px)', 'num', { min: 6, max: 400 }], ['minSize', 'Tamaño mínimo (px)', 'num', { min: 6, max: 400 }],
       ['weight', 'Grosor', 'select', WEIGHTS], ['upper', 'Mayúsculas', 'check'], ['autofit', 'Ajuste automático del texto', 'check']]],
@@ -503,7 +537,7 @@ function renderInsp(box, e, kind) {
     if (e.type === 'ticker') { const nc = card('Noticias', buildNews(e)); nc.classList.add('span'); box.append(nc); }   // las noticias también se editan aquí, en Diseño
     box.append(card(kind === 'ticker' ? 'Altura y posición de la cinta' : 'Posición y tamaño', grid(GEO, e.id)));
     (SECTIONS[e.type] || []).forEach(([t, specs]) => box.append(card(t, grid(specs, e.id))));
-    if (e.type === 'shape' || e.type === 'text') box.append(buildTexture(e));
+    if (e.type === 'shape' || e.type === 'text' || e.type === 'clock') box.append(buildTexture(e));
     if (kind !== 'ticker') box.append(buildActions(e));
   }
   box.querySelectorAll('[data-p]').forEach(i => {
@@ -593,7 +627,8 @@ let drag = null;
 ovl.addEventListener('pointerdown', ev => {
   if (ev.button !== 0) return;
   const g = draftOf(), t = target(); if (!t.els.length || isLocked(g, t)) return;
-  drag = { rs: ev.target.classList.contains('hd'), sx: ev.clientX, sy: ev.clientY, snap: t.els.map(clone), box: bb(t.els), single: !t.group && t.els.length === 1 };
+  const box = bb(t.els);   // cx, cy: esquina que se ve en pantalla (el tirador se queda dentro del escenario aunque el elemento se salga)
+  drag = { rs: ev.target.classList.contains('hd'), sx: ev.clientX, sy: ev.clientY, snap: t.els.map(clone), box, cx: Math.min(box.x + box.w, 1920), cy: Math.min(box.y + box.h, 1080), single: !t.group && t.els.length === 1 };
   ovl.setPointerCapture(ev.pointerId); ev.preventDefault();
 });
 ovl.addEventListener('pointermove', ev => {
@@ -603,11 +638,11 @@ ovl.addEventListener('pointermove', ev => {
     if (!drag.rs) { drag.snap.forEach(o => { const e = byId(g, o.id); if (e) { e.x = Math.round(o.x + dx); e.y = Math.round(o.y + dy); } }); return; }
     if (drag.single) {
       const o = drag.snap[0], e = byId(g, o.id); if (!e) return;
-      let w = Math.max(10, Math.round(o.w + dx)), h = Math.max(10, Math.round(o.h + dy));
+      let w = Math.max(10, Math.round(drag.cx + dx - o.x)), h = Math.max(10, Math.round(drag.cy + dy - o.y));   // la esquina nueva sigue al puntero desde donde está el tirador
       if ((o.type === 'image' && o.lock !== false) || ev.shiftKey) h = Math.max(10, Math.round(w * o.h / o.w));
       e.w = w; e.h = h; return;
     }
-    const kk = Math.max(.05, (drag.box.w + dx) / drag.box.w);   // grupo o selección múltiple: siempre proporcional
+    const kk = Math.max(.05, (drag.cx + dx - drag.box.x) / drag.box.w);   // grupo o selección múltiple: siempre proporcional
     drag.snap.forEach(o => { const e = byId(g, o.id); if (e) scaleEl(e, o, drag.box.x, drag.box.y, kk); });
   });
 });
@@ -676,6 +711,42 @@ function renderSaved() {
   });
 }
 
+// ---------- Programas (conjuntos completos de gráficos) ----------
+let curProg = null; try { curProg = localStorage.getItem('atg_prog'); } catch { /* sin almacenamiento */ }
+const setCurProg = id => { curProg = id; try { id ? localStorage.setItem('atg_prog', id) : localStorage.removeItem('atg_prog'); } catch { /* nada */ } };
+const onAir = () => Object.values(store.get().program).some(g => g && g.visible);
+function afterOpen() {   // tras abrir un programa se reinicia todo lo que dependía de los gráficos anteriores
+  for (const k in SEL) delete SEL[k]; loopOn = false; syncLoopBtns(); prev.stopTest(sel); sel = 'headline'; open = new Set([sel]); animElId = null;
+  ['fields', 'animQuick', 'animFull', 'animEl', 'insp', 'elList', 'editBtns', 'swProg'].forEach(i => { $(i).dataset.k = ''; }); render(store.get());
+}
+$('pSave').onclick = () => {
+  const name = $('pName').value.trim(); if (!name) { alert('Escribe un nombre para el programa.'); return; }
+  const same = store.programs().find(p => norm(p.name) === norm(name));
+  if (same && !confirm(`Ya existe un programa llamado «${same.name}». ¿Reemplazarlo con los gráficos actuales?`)) return;
+  setCurProg(store.saveProgram(name, same && same.id)); $('pName').value = '';
+};
+$('pSearch').oninput = () => { $('pList').dataset.k = ''; renderProgs(); };
+function renderProgs() {
+  const q = norm($('pSearch').value), all = store.programs(), list = all.filter(p => !q || norm(p.name).includes(q));
+  const key = q + '|' + curProg + '|' + list.map(p => p.id + p.ts + p.name).join();
+  const box = $('pList'); if (box.dataset.k === key) return; box.dataset.k = key; box.innerHTML = '';
+  if (!list.length) { box.innerHTML = `<p class="hint">${all.length ? 'Sin resultados.' : 'Todavía no hay programas guardados.'}</p>`; return; }
+  list.forEach(p => {
+    const names = store.progNames(p), r = mk$('div', 'hrow' + (p.id === curProg ? ' edit' : ''));
+    r.innerHTML = `<div class="ht"><b>${esc(p.name)}</b>${p.id === curProg ? '<span class="badge">ABIERTO</span>' : ''}<div class="hh">${names.length} ${names.length === 1 ? 'gráfico' : 'gráficos'}</div><div class="hs">${esc(names.join(' · '))}</div></div><div class="hb"></div>`;
+    const hb = r.querySelector('.hb'), b = (txt, f, c) => { const x = mk$('button', c || '', txt); x.onclick = f; hb.append(x); };
+    b('Abrir', async () => {
+      if (!confirm(`¿Abrir «${p.name}»? Se reemplazan todos los gráficos actuales por los de este programa.${onAir() ? ' Lo que esté al aire saldrá del aire.' : ''}`)) return;
+      await store.openProgram(p.id); setCurProg(p.id); afterOpen();
+    }, 'go');
+    b('Actualizar con lo actual', () => { if (confirm(`¿Reemplazar el contenido guardado de «${p.name}» con los gráficos actuales?`)) setCurProg(store.saveProgram(p.name, p.id)); });
+    b('Renombrar', () => { const n = (prompt('Nuevo nombre del programa:', p.name) || '').trim(); if (n) store.renameProgram(p.id, n); });
+    b('Duplicar', () => store.duplicateProgram(p.id));
+    b('Eliminar', () => { if (confirm(`¿Eliminar el programa «${p.name}»?`)) { if (curProg === p.id) setCurProg(null); store.deleteProgram(p.id); } }, 'danger');
+    box.append(r);
+  });
+}
+
 // ---------- Plantillas ----------
 let tplKey = null;
 function useTemplate(t) {
@@ -739,7 +810,7 @@ function syncEditTools() { $('edUndo').disabled = !store.canUndo(sel); $('edRedo
 // Menú del clic derecho sobre el editor: Copiar, Pegar, Eliminar y Añadir (con submenú al lado, como en Windows)
 const ctx = mk$('div', 'ctx'), sub = mk$('div', 'ctx sub'); ctx.hidden = sub.hidden = true; document.body.append(ctx, sub);
 function hideCtx() { ctx.hidden = true; sub.hidden = true; }
-const ADD_ITEMS = [['text', 'Texto'], ['logo', 'Logotipo'], ['image', 'Imagen'], ['shape', 'Forma'], ['ticker', 'Cintilla']];
+const ADD_ITEMS = [['text', 'Texto'], ['clock', 'Reloj'], ['logo', 'Logotipo'], ['image', 'Imagen'], ['shape', 'Forma'], ['ticker', 'Cintilla']];
 function openSub(btn, pt) {
   sub.innerHTML = ''; sub.append(mk$('div', 'clab', 'En «' + SLOTS[sel].name + '»'));
   ADD_ITEMS.forEach(([k, t]) => { const b = mk$('button', '', t); b.onclick = () => { hideCtx(); addAt(k, pt); }; sub.append(b); });
@@ -796,6 +867,7 @@ function render(s) {
   }
   if (tab === 'ticker') renderTickerTab(g);
   if (tab === 'saved') renderSaved();
+  if (tab === 'prog') renderProgs();
   if (tab === 'tpl') renderTpl();
   drawOvl();
 }
